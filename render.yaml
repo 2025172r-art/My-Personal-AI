@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: my-personal-ai
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: OPENAI_MODEL
+        value: "gpt-6.2-sol"
+      - key: APP_ACCESS_PASSWORD
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        value: "https://ewmbuvntdtucjyuejoat.supabase.co"
+      - key: SUPABASE_PUBLISHABLE_KEY
+        value: "sb_publishable_zpEBrV1-8GA1mjZ-ZrOBNw_ygTmNBeK"
+      - key: MEMORY_API_TOKEN
+        sync: false
