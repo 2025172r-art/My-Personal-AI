@@ -1,13 +1,11 @@
-from __future__ import annotations
+"""Audio helpers for the no-provider-API edition.
 
-from typing import Any
+Use ChromeOS built-in dictation to enter text. Streamlit uses the browser's
+speechSynthesis capability for optional answer read-aloud.
+"""
 
 
-def speech_to_text(client: Any, audio_bytes: bytes) -> str:
-    if not audio_bytes:
-        raise ValueError("音声データが空です。")
-    result = client.audio.transcriptions.create(
-        model="gpt-transcribe",
-        file=("recording.wav", audio_bytes, "audio/wav"),
+def speech_to_text(*_args, **_kwargs) -> str:
+    raise RuntimeError(
+        "外部の音声認識APIは使用しません。Chromebookの音声入力でテキストを入力してください。"
     )
-    return str(result.text).strip()
