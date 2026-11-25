@@ -71,12 +71,7 @@ for key, default in {
 with st.sidebar:
     st.title("🧠 My Personal AI")
     st.caption("Chromebook / Windows / Mac 対応")
-    st.caption("外部AI API・Web検索を使わないローカルモード")
-    use_multi_agent = st.toggle(
-        "複数AIで計画・実行・確認",
-        value=False,
-        help="有効にすると複数回APIを呼ぶため、利用料金が増える場合があります。",
-    )
+    st.caption("生成AIプロバイダーAPIを使わないローカルモード")
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
     st.caption("AIエンジン: Python Local Engine v0.1.0")
     st.caption(f"記憶保存先: {store.backend_name}")
@@ -113,7 +108,7 @@ with chat_tab:
     if send and prompt.strip():
         try:
             store.add_message(st.session_state.session_id, "user", prompt.strip())
-            memories = store.get_memories(limit=12)
+            memories = store.get_memories(limit=100)
             history = store.get_messages(st.session_state.session_id, limit=12)
             with st.spinner("AIエージェントが考えています…"):
                 result = run_agent_task(
@@ -123,7 +118,7 @@ with chat_tab:
                     memories=memories,
                     document_context=st.session_state.uploaded_context,
                     use_web_search=False,
-                    use_multi_agent=use_multi_agent,
+                    use_multi_agent=False,
                 )
             answer = result["answer"]
             store.add_message(st.session_state.session_id, "assistant", answer)
@@ -139,7 +134,7 @@ with chat_tab:
                 st.markdown(f"{index}. {step}")
 
     if st.session_state.latest_answer and speak_answers:
-        st.caption("音声はChromeなどのブラウザ読み上げ機能で生成されます（AI音声）。")
+        st.caption("音声はChromeなどのブラウザー標準の読み上げ機能で再生します。")
         speech_text = json.dumps(st.session_state.latest_answer[:4000], ensure_ascii=False)
         components.html(
             f"""
@@ -183,7 +178,7 @@ with files_tab:
     uploaded = st.file_uploader(
         "PDF / DOCX / TXT / MD / CSV / XLSX",
         type=["pdf", "docx", "txt", "md", "csv", "xlsx"],
-        help="ファイルはテキスト抽出後にAIへ送ります。原本はDBに保存しません。",
+        help="ファイルはテキスト抽出後にアプリ内で処理します。原本はDBに保存しません。",
     )
     if uploaded is not None and st.button("ファイルを読み込む", type="primary"):
         try:
