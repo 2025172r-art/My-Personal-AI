@@ -251,6 +251,12 @@ def _numeric_prefix(text: str) -> float | None:
         return None
 
 
+def _format_number(value: float) -> str:
+    if value.is_integer():
+        return str(int(value))
+    return f"{value:g}"
+
+
 def convert_units(text: str) -> str | None:
     """Convert a quantity, optionally calculated from an expression, into another unit."""
     normalized = _normalize_expression(text).lower()
@@ -292,7 +298,7 @@ def convert_units(text: str) -> str | None:
     result = value * source_info[1] / target_info[1]
     if abs(result) > 10**15:
         return "変換結果が大きすぎるため表示できません。"
-    return f"{value:g}{source_info[2]} = {result:g}{target_info[2]} です。"
+    return f"{_format_number(value)}{source_info[2]} = {_format_number(result)}{target_info[2]} です。"
 
 
 def split_requests(request: str, max_parts: int = 8) -> list[str]:
