@@ -35,7 +35,7 @@ def test_multi_request_reply_handles_every_part():
     assert result["intents"] == ["unit_conversion", "local_knowledge", "planning"]
     assert "1037500m" in result["answer"]
     assert "プログラミング言語" in result["answer"]
-    assert "複数の依頼を3件" in result["answer"]
+    assert "3件の依頼を処理しました" in result["answer"]
     assert result["plan"] == []
     assert "My Personal AI 開発ロードマップ" in result["answer"]
 
@@ -46,7 +46,7 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.3.0"
+    assert engine.health()["version"] == "0.4.0"
     assert engine.health()["multi_intent"] is True
     assert len(engine.tools()) >= 10
 
@@ -89,7 +89,7 @@ def test_knowledge_and_unknown():
     assert "プログラミング言語" in answer["answer"]
     unknown = engine.reply("火星の地下に何がありますか？")
     assert unknown["intent"] == "unknown"
-    assert "まだ私にはありません" in unknown["answer"]
+    assert "根拠を確認できません" in unknown["answer"]
 
 
 def test_command_policy_is_bounded():
