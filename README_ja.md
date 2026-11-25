@@ -10,7 +10,7 @@ Python + Streamlit + OpenAI Responses API + Supabase で作る、個人用AIエ�
 - 長期記憶（Supabase。未設定の開発時はSQLite）
 - 会話履歴（個人用固定IDで再読み込み後も同じ履歴を表示）
 - PDF / DOCX / TXT / MD / CSV / XLSX のテキスト抽出と分析
-- ブラウザのマイク入力、音声文字起こし、回答の音声読み上げ
+- ブラウザのマイク入力、OpenAI音声文字起こし、Chrome標準の音声読み上げ
 - Planner / Worker / Reviewer の3役によるマルチエージェント処理
 - 個人利用向けの簡易パスワードゲート
 
@@ -29,7 +29,7 @@ Python + Streamlit + OpenAI Responses API + Supabase で作る、個人用AIエ�
 
 - app.py: Streamlit画面
 - agent.py: AIの計画・実行・確認
-- audio_tools.py: 音声文字起こしと読み上げ
+- audio_tools.py: 音声文字起こし（回答読み上げはブラウザ標準機能）
 - config.py: Secretsと環境変数
 - memory/: Supabase / SQLiteの記憶ストア
 - tools/: ファイル読み込み
