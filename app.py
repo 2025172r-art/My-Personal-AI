@@ -261,7 +261,7 @@ with setup_tab:
         [
             {"項目": "OpenAI APIキー", "状態": "設定済み" if api_key else "未設定"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
-            {"項目": "SupabaseサーバーSecretキー", "状態": "設定済み" if (get_setting("SUPABASE_SECRET_KEY") or get_setting("SUPABASE_SERVICE_ROLE_KEY")) else "未設定"},
+            {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
         ]
     )
