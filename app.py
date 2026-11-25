@@ -5,11 +5,9 @@ import json
 
 import streamlit as st
 import streamlit.components.v1 as components
-from openai import OpenAI
 
 from agent import run_agent_task
-from audio_tools import speech_to_text
-from config import get_setting, openai_api_key
+from config import get_setting
 from memory.store import MemoryStore
 from tools.file_reader import extract_uploaded_file
 
@@ -55,33 +53,7 @@ def authenticate() -> bool:
 if not authenticate():
     st.stop()
 
-api_key = openai_api_key() or st.session_state.get("runtime_openai_api_key")
-if not api_key:
-    st.title("My Personal AI")
-    st.warning("OpenAI APIキーがまだ設定されていません。")
-    st.write(
-        "OpenAI APIキーはこの画面のパスワード入力欄に直接入力できます。"
-        "キーは現在のブラウザーセッションのメモリ内だけで使い、"
-        "会話履歴・データベース・GitHubには保存しません。"
-    )
-    st.link_button(
-        "OpenAI APIキー管理ページ",
-        "https://platform.openai.com/api-keys",
-        use_container_width=True,
-    )
-    with st.form("openai_key_form"):
-        entered_key = st.text_input("OpenAI APIキー（sk- から始まるキー）", type="password")
-        submit_key = st.form_submit_button("このセッションで接続", type="primary")
-    if submit_key:
-        if not entered_key.startswith("sk-") or len(entered_key) < 20:
-            st.error("APIキーの形式を確認してください。キー全文はチャットに送らないでください。")
-        else:
-            st.session_state.runtime_openai_api_key = entered_key
-            st.success("このセッションにAPIキーを設定しました。")
-            st.rerun()
-    st.stop()
-
-client = OpenAI(api_key=api_key)
+# ローカルAIエンジンは外部の生成AI APIキーを必要としません。
 store = MemoryStore.from_settings()
 
 # Single-owner ID: chat history remains available after reloads and on other devices.
@@ -92,6 +64,7 @@ for key, default in {
     "uploaded_name": "",
     "latest_answer": "",
     "last_plan": [],
+    "last_tools_used": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -99,14 +72,9 @@ for key, default in {
 with st.sidebar:
     st.title("🧠 My Personal AI")
     st.caption("Chromebook / Windows / Mac 対応")
-    use_web_search = st.toggle("Web検索を使う", value=True)
-    use_multi_agent = st.toggle(
-        "複数AIで計画・実行・確認",
-        value=False,
-        help="有効にすると複数回APIを呼ぶため、利用料金が増える場合があります。",
-    )
+    st.caption("外部の生成AI APIを使わないローカルモード")
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
-    st.caption(f"AIモデル: {get_setting('OPENAI_MODEL', 'gpt-6.2-sol')}")
+    st.caption("AIエンジン: Python Local Engine v0.2.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -115,10 +83,10 @@ with st.sidebar:
         st.rerun()
 
 st.title("My Personal AI")
-st.caption("会話・長期記憶・Web検索・ファイル分析・音声・複数AI")
+st.caption("会話・計算・長期記憶・ファイル分析・作業計画・音声読み上げ")
 
-chat_tab, files_tab, memory_tab, setup_tab = st.tabs(
-    ["💬 チャット", "📎 ファイル・音声", "🧠 長期記憶", "⚙️ 接続状態"]
+chat_tab, files_tab, memory_tab, tasks_tab, setup_tab = st.tabs(
+    ["💬 チャット", "📎 ファイル", "🧠 長期記憶", "✅ タスク", "⚙️ 接続状態"]
 )
 
 with chat_tab:
@@ -134,6 +102,7 @@ with chat_tab:
             with st.chat_message(role):
                 st.markdown(item.get("content", ""))
 
+    st.caption("例：計算して 125 * 8 ／ 3kmをmに変換 ／ Pythonとは？ ／ このアプリの計画を立てて")
     with st.form("chat_form", clear_on_submit=True):
         prompt = st.text_area("メッセージ", placeholder="AIに話しかけてください", height=100)
         send = st.form_submit_button("送信", type="primary", use_container_width=True)
@@ -141,25 +110,29 @@ with chat_tab:
     if send and prompt.strip():
         try:
             store.add_message(st.session_state.session_id, "user", prompt.strip())
-            memories = store.get_memories(limit=12)
+            memories = store.get_memories(limit=100)
             history = store.get_messages(st.session_state.session_id, limit=12)
             with st.spinner("AIエージェントが考えています…"):
                 result = run_agent_task(
-                    client=client,
+                    client=None,
                     user_request=prompt.strip(),
                     history=history[:-1],
                     memories=memories,
                     document_context=st.session_state.uploaded_context,
-                    use_web_search=use_web_search,
-                    use_multi_agent=use_multi_agent,
+                    use_web_search=False,
+                    use_multi_agent=False,
                 )
             answer = result["answer"]
             store.add_message(st.session_state.session_id, "assistant", answer)
             st.session_state.latest_answer = answer
             st.session_state.last_plan = result.get("plan", [])
+            st.session_state.last_tools_used = result.get("tools_used", [])
             st.rerun()
         except Exception as exc:
             st.error(f"処理中にエラーが発生しました: {exc}")
+
+    if st.session_state.get("last_tools_used"):
+        st.caption("使用したローカル機能: " + "、".join(st.session_state.last_tools_used))
 
     if st.session_state.last_plan:
         with st.expander("今回のAI作業計画を見る", expanded=True):
@@ -167,7 +140,7 @@ with chat_tab:
                 st.markdown(f"{index}. {step}")
 
     if st.session_state.latest_answer and speak_answers:
-        st.caption("音声はChromeなどのブラウザ読み上げ機能で生成されます（AI音声）。")
+        st.caption("音声はChromeなどのブラウザー標準の読み上げ機能で再生します。")
         speech_text = json.dumps(st.session_state.latest_answer[:4000], ensure_ascii=False)
         components.html(
             f"""
@@ -211,7 +184,7 @@ with files_tab:
     uploaded = st.file_uploader(
         "PDF / DOCX / TXT / MD / CSV / XLSX",
         type=["pdf", "docx", "txt", "md", "csv", "xlsx"],
-        help="ファイルはテキスト抽出後にAIへ送ります。原本はDBに保存しません。",
+        help="ファイルはテキスト抽出後にアプリ内で処理します。原本はDBに保存しません。",
     )
     if uploaded is not None and st.button("ファイルを読み込む", type="primary"):
         try:
@@ -234,17 +207,10 @@ with files_tab:
 
     st.divider()
     st.subheader("音声入力")
-    audio = st.audio_input("マイクで話す", sample_rate=16000)
-    if audio is not None and st.button("音声を文字に変換"):
-        try:
-            transcript = speech_to_text(client, audio.getvalue())
-            st.session_state.transcript_draft = transcript
-        except Exception as exc:
-            st.error(f"音声を変換できませんでした: {exc}")
-
-    if "transcript_draft" in st.session_state:
-        st.text_area("文字起こし結果（編集できます）", key="transcript_draft", height=120)
-        st.info("内容をコピーしてチャット欄に貼り付けてください。")
+    st.info(
+        "外部APIを使わない構成のため、音声の自動文字起こしは現在オフです。"
+        "Chromebookの設定にある音声入力（マイク）で文章を入力し、チャット欄に貼り付けてください。"
+    )
 
 with memory_tab:
     st.subheader("長期記憶")
@@ -275,12 +241,38 @@ with memory_tab:
     except Exception as exc:
         st.error(f"記憶を読み込めませんでした: {exc}")
 
+with tasks_tab:
+    st.subheader("タスク管理")
+    st.write("タスクをSupabaseの長期記憶へ保存します。完了したタスクは削除できます。")
+    with st.form("task_form", clear_on_submit=True):
+        task_text = st.text_input("新しいタスク", placeholder="例：AIエンジンのテストを確認する")
+        add_task = st.form_submit_button("タスクを追加", type="primary")
+    if add_task and task_text.strip():
+        try:
+            store.add_memory("タスク", task_text.strip())
+            st.success("タスクを保存しました。")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"タスクを保存できませんでした: {exc}")
+    try:
+        tasks = [item for item in store.get_memories(limit=100) if item.get("category") == "タスク"]
+        if not tasks:
+            st.info("タスクはありません。")
+        for item in tasks:
+            with st.container(border=True):
+                st.write(item.get("content", ""))
+                if st.button("完了・削除", key=f"complete_task_{item['id']}"):
+                    store.delete_memory(str(item["id"]))
+                    st.rerun()
+    except Exception as exc:
+        st.error(f"タスクを読み込めませんでした: {exc}")
+
 with setup_tab:
     st.subheader("接続状況")
-    st.write("APIキーやDB接続情報は、コードではなくホスティング先のSecretsに設定してください。")
+    st.write("AI処理はPython内で実行します。Supabaseへの記憶保存のみクラウド通信を使います。")
     st.table(
         [
-            {"項目": "OpenAI APIキー", "状態": "環境変数・セッションで設定済み" if api_key else "未設定"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v0.2.0（生成AI API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -290,16 +282,16 @@ with setup_tab:
         """
         Renderの環境変数:
         - APP_ACCESS_PASSWORD
-        - OPENAI_API_KEY（任意。環境変数に置かない場合は、ログイン後の専用入力欄を使用）
-        - OPENAI_MODEL（既定値: gpt-6.2-sol）
         - SUPABASE_URL
         - SUPABASE_PUBLISHABLE_KEY
         - MEMORY_API_TOKEN
 
+        生成AIプロバイダーのAPIキーは使用しません。
         Supabaseの強いSecretキーはEdge Function内だけで使用し、RenderやGitHubには置きません。
         """
     )
-    st.caption("この初期版は個人利用向けです。外部への送信・購入・投稿などは自動実行しません。")
+    st.markdown("**現在のエンジン機能**\n\n- 日本語の基本会話とヘルプ\n- 安全な計算・単位変換\n- 日時・記憶検索\n- 資料の関連文検索・抽出的な要約\n- タスクの保存・削除\n- 目的別の計画作成\n\n**未対応**：自由な文章生成、最新Web検索、音声の自動文字起こし。")
+    st.caption("個人利用向けの初期版です。外部への送信・購入・投稿などは自動実行しません。")
 
 st.divider()
 st.caption("My Personal AI · 個人用開発プロトタイプ")
