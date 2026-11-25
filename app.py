@@ -55,9 +55,30 @@ def authenticate() -> bool:
 if not authenticate():
     st.stop()
 
-api_key = openai_api_key()
+api_key = openai_api_key() or st.session_state.get("runtime_openai_api_key")
 if not api_key:
-    st.error("OPENAI_API_KEY が未設定です。Streamlit Secrets に設定してください。")
+    st.title("My Personal AI")
+    st.warning("OpenAI APIキーがまだ設定されていません。")
+    st.write(
+        "OpenAI APIキーはこの画面のパスワード入力欄に直接入力できます。"
+        "キーは現在のブラウザーセッションのメモリ内だけで使い、"
+        "会話履歴・データベース・GitHubには保存しません。"
+    )
+    st.link_button(
+        "OpenAI APIキー管理ページ",
+        "https://platform.openai.com/api-keys",
+        use_container_width=True,
+    )
+    with st.form("openai_key_form"):
+        entered_key = st.text_input("OpenAI APIキー（sk- から始まるキー）", type="password")
+        submit_key = st.form_submit_button("このセッションで接続", type="primary")
+    if submit_key:
+        if not entered_key.startswith("sk-") or len(entered_key) < 20:
+            st.error("APIキーの形式を確認してください。キー全文はチャットに送らないでください。")
+        else:
+            st.session_state.runtime_openai_api_key = entered_key
+            st.success("このセッションにAPIキーを設定しました。")
+            st.rerun()
     st.stop()
 
 client = OpenAI(api_key=api_key)
@@ -259,7 +280,7 @@ with setup_tab:
     st.write("APIキーやDB接続情報は、コードではなくホスティング先のSecretsに設定してください。")
     st.table(
         [
-            {"項目": "OpenAI APIキー", "状態": "設定済み" if api_key else "未設定"},
+            {"項目": "OpenAI APIキー", "状態": "環境変数・セッションで設定済み" if api_key else "未設定"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -267,14 +288,15 @@ with setup_tab:
     )
     st.markdown(
         """
-        Secretsに設定する項目:
-        - OPENAI_API_KEY
-        - OPENAI_MODEL（既定値: gpt-6.2-sol）
+        Renderの環境変数:
         - APP_ACCESS_PASSWORD
+        - OPENAI_API_KEY（任意。環境変数に置かない場合は、ログイン後の専用入力欄を使用）
+        - OPENAI_MODEL（既定値: gpt-6.2-sol）
         - SUPABASE_URL
-        - SUPABASE_SERVICE_ROLE_KEY
+        - SUPABASE_PUBLISHABLE_KEY
+        - MEMORY_API_TOKEN
 
-        SupabaseのService Roleキーは強い秘密情報です。サーバー側Secretsだけに保存してください。
+        Supabaseの強いSecretキーはEdge Function内だけで使用し、RenderやGitHubには置きません。
         """
     )
     st.caption("この初期版は個人利用向けです。外部への送信・購入・投稿などは自動実行しません。")
