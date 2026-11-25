@@ -64,6 +64,7 @@ for key, default in {
     "uploaded_name": "",
     "latest_answer": "",
     "last_plan": [],
+    "last_tools_used": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -71,9 +72,9 @@ for key, default in {
 with st.sidebar:
     st.title("🧠 My Personal AI")
     st.caption("Chromebook / Windows / Mac 対応")
-    st.caption("生成AIプロバイダーAPIを使わないローカルモード")
+    st.caption("外部の生成AI APIを使わないローカルモード")
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
-    st.caption("AIエンジン: Python Local Engine v0.1.0")
+    st.caption("AIエンジン: Python Local Engine v0.2.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -82,10 +83,10 @@ with st.sidebar:
         st.rerun()
 
 st.title("My Personal AI")
-st.caption("会話・長期記憶・Web検索・ファイル分析・音声・複数AI")
+st.caption("会話・計算・長期記憶・ファイル分析・作業計画・音声読み上げ")
 
-chat_tab, files_tab, memory_tab, setup_tab = st.tabs(
-    ["💬 チャット", "📎 ファイル・音声", "🧠 長期記憶", "⚙️ 接続状態"]
+chat_tab, files_tab, memory_tab, tasks_tab, setup_tab = st.tabs(
+    ["💬 チャット", "📎 ファイル", "🧠 長期記憶", "✅ タスク", "⚙️ 接続状態"]
 )
 
 with chat_tab:
@@ -101,6 +102,7 @@ with chat_tab:
             with st.chat_message(role):
                 st.markdown(item.get("content", ""))
 
+    st.caption("例：計算して 125 * 8 ／ 3kmをmに変換 ／ Pythonとは？ ／ このアプリの計画を立てて")
     with st.form("chat_form", clear_on_submit=True):
         prompt = st.text_area("メッセージ", placeholder="AIに話しかけてください", height=100)
         send = st.form_submit_button("送信", type="primary", use_container_width=True)
@@ -124,9 +126,13 @@ with chat_tab:
             store.add_message(st.session_state.session_id, "assistant", answer)
             st.session_state.latest_answer = answer
             st.session_state.last_plan = result.get("plan", [])
+            st.session_state.last_tools_used = result.get("tools_used", [])
             st.rerun()
         except Exception as exc:
             st.error(f"処理中にエラーが発生しました: {exc}")
+
+    if st.session_state.get("last_tools_used"):
+        st.caption("使用したローカル機能: " + "、".join(st.session_state.last_tools_used))
 
     if st.session_state.last_plan:
         with st.expander("今回のAI作業計画を見る", expanded=True):
@@ -235,12 +241,38 @@ with memory_tab:
     except Exception as exc:
         st.error(f"記憶を読み込めませんでした: {exc}")
 
+with tasks_tab:
+    st.subheader("タスク管理")
+    st.write("タスクをSupabaseの長期記憶へ保存します。完了したタスクは削除できます。")
+    with st.form("task_form", clear_on_submit=True):
+        task_text = st.text_input("新しいタスク", placeholder="例：AIエンジンのテストを確認する")
+        add_task = st.form_submit_button("タスクを追加", type="primary")
+    if add_task and task_text.strip():
+        try:
+            store.add_memory("タスク", task_text.strip())
+            st.success("タスクを保存しました。")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"タスクを保存できませんでした: {exc}")
+    try:
+        tasks = [item for item in store.get_memories(limit=100) if item.get("category") == "タスク"]
+        if not tasks:
+            st.info("タスクはありません。")
+        for item in tasks:
+            with st.container(border=True):
+                st.write(item.get("content", ""))
+                if st.button("完了・削除", key=f"complete_task_{item['id']}"):
+                    store.delete_memory(str(item["id"]))
+                    st.rerun()
+    except Exception as exc:
+        st.error(f"タスクを読み込めませんでした: {exc}")
+
 with setup_tab:
     st.subheader("接続状況")
-    st.write("APIキーやDB接続情報は、コードではなくホスティング先のSecretsに設定してください。")
+    st.write("AI処理はPython内で実行します。Supabaseへの記憶保存のみクラウド通信を使います。")
     st.table(
         [
-            {"項目": "AIエンジン", "状態": "Python Local Engine v0.1.0（API不要）"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v0.2.0（生成AI API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -258,7 +290,8 @@ with setup_tab:
         Supabaseの強いSecretキーはEdge Function内だけで使用し、RenderやGitHubには置きません。
         """
     )
-    st.caption("この初期版は個人利用向けです。外部への送信・購入・投稿などは自動実行しません。")
+    st.markdown("**現在のエンジン機能**\n\n- 日本語の基本会話とヘルプ\n- 安全な計算・単位変換\n- 日時・記憶検索\n- 資料の関連文検索・抽出的な要約\n- タスクの保存・削除\n- 目的別の計画作成\n\n**未対応**：自由な文章生成、最新Web検索、音声の自動文字起こし。")
+    st.caption("個人利用向けの初期版です。外部への送信・購入・投稿などは自動実行しません。")
 
 st.divider()
 st.caption("My Personal AI · 個人用開発プロトタイプ")
