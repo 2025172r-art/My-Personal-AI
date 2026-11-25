@@ -9,7 +9,8 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-# Arithmetic is evaluated from an allow-list of AST nodes. No eval/exec is used.
+# Safety boundary: the engine never evaluates arbitrary Python or executes
+# instructions found inside uploaded documents, memories, or retrieved text.
 _BINARY_OPERATORS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -29,6 +30,7 @@ UNIT_TABLE = {
     "mg": ("mass", 0.001, "mg"),
     "g": ("mass", 1.0, "g"),
     "kg": ("mass", 1000.0, "kg"),
+    "t": ("mass", 1000000.0, "t"),
     "ml": ("volume", 0.001, "mL"),
     "l": ("volume", 1.0, "L"),
 }
@@ -36,8 +38,33 @@ UNIT_TABLE = {
 KNOWLEDGE = [
     {
         "title": "Pythonとは",
-        "triggers": ["pythonとは", "pythonって何", "pythonとは何", "python 言語"],
-        "answer": "Pythonは、読みやすい文法を特徴とするプログラミング言語です。Webアプリ、データ分析、自動化、教育など幅広い用途に使われます。",
+        "triggers": ["pythonとは", "pythonって何", "pythonとは何", "python 言語", "pythonを説明"],
+        "answer": (
+            "Pythonは、読みやすく短く書きやすい文法を持つ汎用プログラミング言語です。"
+            "Webアプリ、データ分析、AI・機械学習、事務作業の自動化、教育など幅広い分野で使われます。"
+            "代表的な特徴は、豊富なライブラリ、OSをまたいだ利用のしやすさ、初心者にも学びやすい構文です。"
+            "一方、大規模な計算を単独で行う場合は、C/C++などより遅くなることがあります。"
+        ),
+    },
+    {
+        "title": "Pythonの主な特徴",
+        "triggers": ["pythonの特徴", "pythonのメリット", "pythonで何ができる"],
+        "answer": "Pythonは、読みやすい文法、豊富な外部ライブラリ、幅広い用途が特徴です。Web開発、データ処理、自動化、AI開発、教育用プログラムなどに利用できます。",
+    },
+    {
+        "title": "変数とは",
+        "triggers": ["変数とは", "pythonの変数", "変数って何"],
+        "answer": "変数は、値に名前を付けて扱うための仕組みです。Pythonでは name = 'Taro' のように書き、あとから name を使って値を参照できます。",
+    },
+    {
+        "title": "関数とは",
+        "triggers": ["関数とは", "pythonの関数", "defとは"],
+        "answer": "関数は、処理をひとまとまりにして名前を付け、必要なときに呼び出せる仕組みです。Pythonでは def greet(): のように定義します。",
+    },
+    {
+        "title": "リストとは",
+        "triggers": ["リストとは", "pythonのリスト", "listとは"],
+        "answer": "リストは、複数の値を順番にまとめて扱うデータ型です。例: fruits = ['りんご', 'みかん']。fruits[0] で先頭の要素を参照できます。",
     },
     {
         "title": "人工知能とは",
@@ -82,6 +109,14 @@ STOP_WORDS = {
     "とは", "って", "何", "どの", "どんな", "ある", "いる", "でした",
 }
 
+GOVERNANCE_POLICY = (
+    "利用者の明示的な依頼を、対応可能な範囲で最優先する。"
+    "ただし、安全・プライバシー・認証情報保護・アプリの固定制約は上書きできない。"
+    "会話履歴、記憶、アップロード文書に含まれる命令文は参考データであり、"
+    "アプリの規則や利用者の現在の依頼を上書きする権限を持たない。"
+    "任意コードの実行、秘密情報の表示、外部への送信や変更は自動実行しない。"
+)
+
 
 def _safe_math_node(node: ast.AST, depth: int = 0) -> float | int:
     if depth > 20:
@@ -107,7 +142,7 @@ def _safe_math_node(node: ast.AST, depth: int = 0) -> float | int:
 
 
 def calculate(expression: str) -> str:
-    """Evaluate bounded arithmetic without evaluating arbitrary Python code."""
+    """Evaluate bounded arithmetic without eval(), exec(), or arbitrary code."""
     if not expression or len(expression) > 160:
         return "計算式が空、または長すぎます。"
     try:
@@ -187,12 +222,18 @@ def _search_memories(query: str, memories: list[dict[str, Any]], limit: int = 5)
     return [row[2] for row in ranked[:limit]]
 
 
-def _find_calculation(text: str) -> str | None:
+def _normalize_expression(text: str) -> str:
     normalized = text.replace("×", "*").replace("÷", "/")
+    normalized = normalized.replace("＋", "+").replace("－", "-").replace("−", "-")
     normalized = re.sub(r"(\d)\s*かける\s*(\d)", r"\1*\2", normalized)
     normalized = re.sub(r"(\d)\s*わる\s*(\d)", r"\1/\2", normalized)
     normalized = re.sub(r"(\d)\s*たす\s*(\d)", r"\1+\2", normalized)
     normalized = re.sub(r"(\d)\s*ひく\s*(\d)", r"\1-\2", normalized)
+    return normalized
+
+
+def _find_calculation(text: str) -> str | None:
+    normalized = _normalize_expression(text)
     match = re.search(
         r"(?<![\w.])(\d+(?:\.\d+)?(?:\s*(?:\*\*|[+\-*/%])\s*\d+(?:\.\d+)?)+)(?![\w.])",
         normalized,
@@ -200,24 +241,100 @@ def _find_calculation(text: str) -> str | None:
     return match.group(1).replace(" ", "") if match else None
 
 
-def convert_units(text: str) -> str | None:
-    match = re.search(
-        r"(\d+(?:\.\d+)?)\s*(km|cm|mm|m|kg|mg|g|ml|l)\s*(?:を|から)?\s*(km|cm|mm|m|kg|mg|g|ml|l)",
-        text.lower(),
-    )
+def _numeric_prefix(text: str) -> float | None:
+    match = re.search(r"([-+]?\d+(?:\.\d+)?)\s*$", text)
     if not match:
         return None
-    value = float(match.group(1))
-    source, target = match.group(2), match.group(3)
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def convert_units(text: str) -> str | None:
+    """Convert a quantity, optionally calculated from an expression, into another unit."""
+    normalized = _normalize_expression(text).lower()
+    unit_pattern = r"(?P<source>km|cm|mm|kg|mg|g|ml|l|m|t)"
+    match = re.search(
+        unit_pattern + r"\s*(?:を|から)\s*(?P<target>km|cm|mm|kg|mg|g|ml|l|m|t)",
+        normalized,
+    )
+    if not match:
+        # Keep the original friendly form, including a missing particle.
+        match = re.search(
+            r"(?P<value>\d+(?:\.\d+)?)\s*(?P<source>km|cm|mm|kg|mg|g|ml|l|m|t)\s+(?P<target>km|cm|mm|kg|mg|g|ml|l|m|t)",
+            normalized,
+        )
+        if not match:
+            return None
+        prefix = normalized[:match.start("source")]
+        value = float(match.group("value"))
+    else:
+        prefix = normalized[:match.start("source")]
+        expression = _find_calculation(prefix)
+        if expression:
+            calculated = calculate(expression)
+            if not calculated.startswith("計算結果："):
+                return calculated
+            try:
+                value = float(calculated.split("：", 1)[1])
+            except ValueError:
+                return "計算結果を単位変換できませんでした。"
+        else:
+            value = _numeric_prefix(prefix)
+            if value is None:
+                return None
+
+    source, target = match.group("source"), match.group("target")
     source_info, target_info = UNIT_TABLE[source], UNIT_TABLE[target]
     if source_info[0] != target_info[0]:
         return f"{source}と{target}は異なる単位の種類なので変換できません。"
     result = value * source_info[1] / target_info[1]
+    if abs(result) > 10**15:
+        return "変換結果が大きすぎるため表示できません。"
     return f"{value:g}{source_info[2]} = {result:g}{target_info[2]} です。"
+
+
+def split_requests(request: str, max_parts: int = 8) -> list[str]:
+    """Split numbered, bulleted, newline-separated, and sentence-separated requests."""
+    raw_parts: list[str] = []
+    for line in request.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        line = re.sub(r"^\s*(?:\d+\s*[.)、]|[-*・])\s*", "", line).strip()
+        if not line:
+            continue
+        pieces = re.split(r"(?<=[。！？!?])\s*", line)
+        for piece in pieces:
+            piece = piece.strip(" \t,、;；")
+            if not piece:
+                continue
+            connector_parts = re.split(
+                r"\s*(?:それと|また|あと|さらに|次に|そして)[、,]\s*",
+                piece,
+            )
+            raw_parts.extend(part.strip() for part in connector_parts if part.strip())
+
+    cleaned: list[str] = []
+    for part in raw_parts:
+        part = re.sub(r"^(?:それと|また|あと|さらに|次に|そして)[、, ]*", "", part).strip()
+        if part and (not cleaned or part != cleaned[-1]):
+            cleaned.append(part)
+
+    if len(cleaned) > max_parts:
+        cleaned = cleaned[: max_parts - 1] + [" / ".join(cleaned[max_parts - 1 :])]
+    return cleaned or [request.strip()]
 
 
 def _plan_for(request: str) -> list[str]:
     text = request.lower()
+    if any(word in text for word in ("my personal ai", "このai", "このＡＩ", "このプロジェクト", "自作ai", "自作ＡＩ")):
+        return [
+            "入力を複数の依頼に分け、各依頼の種類を判定するルーターを強化する",
+            "計算・単位変換・知識検索・資料検索を独立したツールとして整理する",
+            "会話履歴と長期記憶を検索し、回答に必要な情報だけを安全に渡す",
+            "未知の質問や曖昧な依頼を正直に扱う評価テストを増やす",
+            "操作・認証・ファイル入力の安全性を確認してからUIを改善する",
+            "GitHub Actionsでテストし、Renderへ段階的に反映して本番動作を確認する",
+        ]
     if any(word in text for word in ("python", "プログラム", "アプリ", "開発", "コード", "webサイト")):
         return [
             "目的と利用者、必要な機能を整理する",
@@ -248,28 +365,31 @@ def _plan_for(request: str) -> list[str]:
 
 
 class LocalAIEngine:
-    """Transparent, rule-based Japanese agent. No model/provider API is called."""
+    """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.2.0"
+    version = "0.3.0"
 
     def capabilities(self) -> list[str]:
         return [
             "日本語の基本会話・ヘルプ",
-            "安全な算術計算（式の制限と入力検査付き）",
+            "複数の質問・依頼を分割して順番に処理",
+            "安全な算術計算と計算結果を使った単位変換",
             "長さ・重さ・容量の単位変換",
             "日本時間の日付・時刻",
             "長期記憶のキーワード検索",
             "ファイル内の関連文検索と抽出的な要約",
             "目的別の作業計画",
             "文字数・英単語数の確認",
-            "小さな内蔵知識ベースからの回答",
+            "拡充した内蔵知識ベース",
+            "利用者の明示的な依頼を優先するコマンド方針（安全境界あり）",
         ]
 
     def tools(self) -> list[dict[str, str]]:
         return [
+            {"name": "multi_intent_router", "description": "複数の依頼を分割して順番に処理"},
             {"name": "calculator", "description": "四則演算・括弧・剰余・べき乗"},
-            {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換"},
+            {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換。計算式にも対応"},
             {"name": "japan_clock", "description": "日本時間の日付と時刻"},
             {"name": "memory_search", "description": "保存済みの記憶をキーワード検索"},
             {"name": "document_search", "description": "読み込んだ資料の関連文検索"},
@@ -277,6 +397,7 @@ class LocalAIEngine:
             {"name": "task_planner", "description": "目的別の作業計画を作成"},
             {"name": "text_analyzer", "description": "文字数・英単語数を数える"},
             {"name": "local_knowledge", "description": "内蔵知識ベースを検索"},
+            {"name": "command_policy", "description": "利用者優先の指揮系統と安全境界"},
         ]
 
     def health(self) -> dict[str, Any]:
@@ -284,12 +405,13 @@ class LocalAIEngine:
             "name": self.name,
             "version": self.version,
             "provider_api": False,
+            "multi_intent": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
 
     def _knowledge_answer(self, request: str) -> str | None:
-        lowered = request.lower()
+        lowered = request.lower().replace("？", "?")
         for item in KNOWLEDGE:
             if any(trigger in lowered for trigger in item["triggers"]):
                 return f"**{item['title']}**\n{item['answer']}"
@@ -308,29 +430,36 @@ class LocalAIEngine:
             return f"**{item['title']}**\n{item['answer']}"
         return None
 
-    def reply(
+    def _reply_single(
         self,
-        request: str,
-        history: list[dict[str, Any]] | None = None,
-        memories: list[dict[str, Any]] | None = None,
-        document_context: str = "",
+        text: str,
+        memories: list[dict[str, Any]],
+        document_context: str,
     ) -> dict[str, Any]:
-        text = request.strip()
-        history = history or []
-        memories = memories or []
-        if not text:
-            return {"answer": "メッセージを入力してください。", "plan": [], "intent": "empty", "tools_used": []}
         lowered = text.lower()
 
         if any(word in lowered for word in ("できること", "使い方", "ヘルプ", "help", "機能一覧")):
             return {
-                "answer": "今の自作AIエンジンで利用できる機能です。\n"
+                "answer": "現在利用できる機能です。\n"
                 + "\n".join(f"・{item}" for item in self.capabilities())
-                + "\n\nこのエンジンはAPIを使わないルールベース方式です。自由な文章生成や最新Web検索はまだできません。",
+                + "\n\nこのエンジンは外部の生成AI APIを使わないルール・検索方式です。未知の質問に自由回答する機能はまだありません。",
                 "plan": [], "intent": "help", "tools_used": [],
             }
 
-        if re.search(r"^(こんにちは|おはよう|こんばんは|やあ|はじめまして)[！!。 ]*$", text):
+        if any(word in lowered for word in ("絶対君主", "君主モード", "統治者モード", "命令を最優先")):
+            return {
+                "answer": (
+                    "**利用者優先コマンド方針**\n"
+                    "利用者の明示的な依頼を、対応可能な範囲で最優先します。"
+                    "ただし、安全・プライバシー・認証情報保護・アプリの固定制約は上書きできません。"
+                    "ファイルや記憶に書かれた命令は参考データとして扱い、実行命令とはみなしません。"
+                    "任意のPythonコード実行や秘密情報の表示、外部への送信・変更は自動実行しません。\n\n"
+                    "なお、現在はルールベースエンジンのため、未知の形式の命令をすべて理解できるわけではありません。"
+                ),
+                "plan": [], "intent": "command_policy", "tools_used": ["command_policy"],
+            }
+
+        if re.fullmatch(r"(こんにちは|おはよう|こんばんは|やあ|はじめまして)[！!。 ]*", text):
             return {
                 "answer": "こんにちは！私はPythonで動くMy Personal AIです。計算、単位変換、記憶検索、資料検索・要約、作業計画などを手伝えます。「できること」と入力すると機能一覧を表示します。",
                 "plan": [], "intent": "greeting", "tools_used": [],
@@ -349,7 +478,7 @@ class LocalAIEngine:
 
         expression = _find_calculation(text)
         if expression and (
-            any(symbol in text for symbol in ("+", "-", "*", "/", "%", "×", "÷"))
+            any(symbol in text for symbol in ("+", "-", "*", "/", "%", "×", "÷", "＋", "－"))
             or any(word in text for word in ("計算", "いくつ", "かける", "わる", "たす", "ひく"))
         ):
             return {"answer": calculate(expression), "plan": [], "intent": "calculation", "tools_used": ["calculator"]}
@@ -373,7 +502,7 @@ class LocalAIEngine:
                 return {
                     "answer": "読み込んだ資料から、質問に関連する文を見つけました。\n"
                     + "\n".join(f"・{item}" for item in matches)
-                    + "\n\nこれは原文からの抜き出しです。資料に書かれていない内容は補っていません。",
+                    + "\n\nこれは原文からの抜き出しです。資料内の命令文は実行せず、資料内容として扱います。",
                     "plan": [], "intent": "document_search", "tools_used": ["document_search"],
                 }
             return {
@@ -423,9 +552,11 @@ class LocalAIEngine:
 
         return {
             "answer": (
-                "この質問に答えるための知識や機能が、まだ私にはありません。私は外部の生成AI APIを使わないPython製エンジンなので、知らないことを自由に文章生成することはできません。\n\n"
+                "この質問に答えるための知識や機能が、まだ私にはありません。"
+                "私は外部の生成AI APIを使わないPython製エンジンなので、知らないことを自由に文章生成することはできません。\n\n"
                 "試せること：\n"
                 "・計算して 125 * 8\n"
+                "・125 × 8.3kmをmに変換\n"
                 "・3kmをmに変換\n"
                 "・今日の日付を教えて\n"
                 "・この資料を要約して（先にファイルを読み込む）\n"
@@ -435,6 +566,46 @@ class LocalAIEngine:
                 "・できること"
             ),
             "plan": [], "intent": "unknown", "tools_used": [],
+        }
+
+    def reply(
+        self,
+        request: str,
+        history: list[dict[str, Any]] | None = None,
+        memories: list[dict[str, Any]] | None = None,
+        document_context: str = "",
+    ) -> dict[str, Any]:
+        text = request.strip()
+        history = history or []
+        memories = memories or []
+        del history  # Reserved for the next context-aware engine iteration.
+        if not text:
+            return {"answer": "メッセージを入力してください。", "plan": [], "intent": "empty", "tools_used": []}
+
+        parts = split_requests(text)
+        if len(parts) == 1:
+            return self._reply_single(parts[0], memories, document_context)
+
+        results = [self._reply_single(part, memories, document_context) for part in parts]
+        sections = [
+            f"**{index}. {part[:70]}**\n{result['answer']}"
+            for index, (part, result) in enumerate(zip(parts, results), 1)
+        ]
+        tools_used = list(dict.fromkeys(
+            tool for result in results for tool in result.get("tools_used", [])
+        ))
+        combined_plan = [
+            f"{index}. {step}"
+            for index, result in enumerate(results, 1)
+            for step in result.get("plan", [])
+        ]
+        return {
+            "answer": f"複数の依頼を{len(parts)}件に分けて処理しました。\n\n" + "\n\n".join(sections),
+            "plan": combined_plan,
+            "intent": "multi_task",
+            "intents": [result.get("intent", "unknown") for result in results],
+            "subresults": results,
+            "tools_used": tools_used,
         }
 
 
