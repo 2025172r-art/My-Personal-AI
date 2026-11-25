@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hmac
+import json
 
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 
 from agent import run_agent_task
-from audio_tools import speech_to_text, text_to_speech
+from audio_tools import speech_to_text
 from config import get_setting, openai_api_key
 from memory.store import MemoryStore
 from tools.file_reader import extract_uploaded_file
@@ -144,12 +146,44 @@ with chat_tab:
                 st.markdown(f"{index}. {step}")
 
     if st.session_state.latest_answer and speak_answers:
-        if st.button("最新の回答を音声で再生"):
-            try:
-                audio_bytes = text_to_speech(client, st.session_state.latest_answer)
-                st.audio(audio_bytes, format="audio/mpeg")
-            except Exception as exc:
-                st.error(f"音声を作成できませんでした: {exc}")
+        st.caption("音声はChromeなどのブラウザ読み上げ機能で生成されます（AI音声）。")
+        speech_text = json.dumps(st.session_state.latest_answer[:4000], ensure_ascii=False)
+        components.html(
+            f"""
+            <div style="display:flex;gap:8px;align-items:center;font-family:system-ui">
+              <button id="speak" style="padding:10px 14px;border:0;border-radius:10px;background:#61D6B5;color:#09211b;font-weight:600">
+                ▶ 音声で再生
+              </button>
+              <button id="stop" style="padding:10px 14px;border:1px solid #777;border-radius:10px;background:transparent;color:inherit">
+                ■ 停止
+              </button>
+              <span id="speech-status" style="font-size:12px;opacity:.75"></span>
+            </div>
+            <script>
+              const speechText = {speech_text};
+              const status = document.getElementById("speech-status");
+              document.getElementById("speak").addEventListener("click", () => {{
+                if (!("speechSynthesis" in window)) {{
+                  status.textContent = "このブラウザは音声読み上げに対応していません。";
+                  return;
+                }}
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(speechText);
+                utterance.lang = "ja-JP";
+                utterance.rate = 1.0;
+                utterance.onstart = () => status.textContent = "再生中";
+                utterance.onend = () => status.textContent = "再生完了";
+                utterance.onerror = () => status.textContent = "再生できませんでした";
+                window.speechSynthesis.speak(utterance);
+              }});
+              document.getElementById("stop").addEventListener("click", () => {{
+                if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+                status.textContent = "停止しました";
+              }});
+            </script>
+            """,
+            height=65,
+        )
 
 with files_tab:
     st.subheader("ファイル分析")
