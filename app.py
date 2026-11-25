@@ -5,11 +5,9 @@ import json
 
 import streamlit as st
 import streamlit.components.v1 as components
-from openai import OpenAI
 
 from agent import run_agent_task
-from audio_tools import speech_to_text
-from config import get_setting, openai_api_key
+from config import get_setting
 from memory.store import MemoryStore
 from tools.file_reader import extract_uploaded_file
 
@@ -55,33 +53,7 @@ def authenticate() -> bool:
 if not authenticate():
     st.stop()
 
-api_key = openai_api_key() or st.session_state.get("runtime_openai_api_key")
-if not api_key:
-    st.title("My Personal AI")
-    st.warning("OpenAI APIキーがまだ設定されていません。")
-    st.write(
-        "OpenAI APIキーはこの画面のパスワード入力欄に直接入力できます。"
-        "キーは現在のブラウザーセッションのメモリ内だけで使い、"
-        "会話履歴・データベース・GitHubには保存しません。"
-    )
-    st.link_button(
-        "OpenAI APIキー管理ページ",
-        "https://platform.openai.com/api-keys",
-        use_container_width=True,
-    )
-    with st.form("openai_key_form"):
-        entered_key = st.text_input("OpenAI APIキー（sk- から始まるキー）", type="password")
-        submit_key = st.form_submit_button("このセッションで接続", type="primary")
-    if submit_key:
-        if not entered_key.startswith("sk-") or len(entered_key) < 20:
-            st.error("APIキーの形式を確認してください。キー全文はチャットに送らないでください。")
-        else:
-            st.session_state.runtime_openai_api_key = entered_key
-            st.success("このセッションにAPIキーを設定しました。")
-            st.rerun()
-    st.stop()
-
-client = OpenAI(api_key=api_key)
+# ローカルAIエンジンは外部の生成AI APIキーを必要としません。
 store = MemoryStore.from_settings()
 
 # Single-owner ID: chat history remains available after reloads and on other devices.
@@ -99,14 +71,14 @@ for key, default in {
 with st.sidebar:
     st.title("🧠 My Personal AI")
     st.caption("Chromebook / Windows / Mac 対応")
-    use_web_search = st.toggle("Web検索を使う", value=True)
+    st.caption("外部AI API・Web検索を使わないローカルモード")
     use_multi_agent = st.toggle(
         "複数AIで計画・実行・確認",
         value=False,
         help="有効にすると複数回APIを呼ぶため、利用料金が増える場合があります。",
     )
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
-    st.caption(f"AIモデル: {get_setting('OPENAI_MODEL', 'gpt-6.2-sol')}")
+    st.caption("AIエンジン: Python Local Engine v0.1.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -145,12 +117,12 @@ with chat_tab:
             history = store.get_messages(st.session_state.session_id, limit=12)
             with st.spinner("AIエージェントが考えています…"):
                 result = run_agent_task(
-                    client=client,
+                    client=None,
                     user_request=prompt.strip(),
                     history=history[:-1],
                     memories=memories,
                     document_context=st.session_state.uploaded_context,
-                    use_web_search=use_web_search,
+                    use_web_search=False,
                     use_multi_agent=use_multi_agent,
                 )
             answer = result["answer"]
@@ -234,17 +206,10 @@ with files_tab:
 
     st.divider()
     st.subheader("音声入力")
-    audio = st.audio_input("マイクで話す", sample_rate=16000)
-    if audio is not None and st.button("音声を文字に変換"):
-        try:
-            transcript = speech_to_text(client, audio.getvalue())
-            st.session_state.transcript_draft = transcript
-        except Exception as exc:
-            st.error(f"音声を変換できませんでした: {exc}")
-
-    if "transcript_draft" in st.session_state:
-        st.text_area("文字起こし結果（編集できます）", key="transcript_draft", height=120)
-        st.info("内容をコピーしてチャット欄に貼り付けてください。")
+    st.info(
+        "外部APIを使わない構成のため、音声の自動文字起こしは現在オフです。"
+        "Chromebookの設定にある音声入力（マイク）で文章を入力し、チャット欄に貼り付けてください。"
+    )
 
 with memory_tab:
     st.subheader("長期記憶")
@@ -280,7 +245,7 @@ with setup_tab:
     st.write("APIキーやDB接続情報は、コードではなくホスティング先のSecretsに設定してください。")
     st.table(
         [
-            {"項目": "OpenAI APIキー", "状態": "環境変数・セッションで設定済み" if api_key else "未設定"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v0.1.0（API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -290,12 +255,11 @@ with setup_tab:
         """
         Renderの環境変数:
         - APP_ACCESS_PASSWORD
-        - OPENAI_API_KEY（任意。環境変数に置かない場合は、ログイン後の専用入力欄を使用）
-        - OPENAI_MODEL（既定値: gpt-6.2-sol）
         - SUPABASE_URL
         - SUPABASE_PUBLISHABLE_KEY
         - MEMORY_API_TOKEN
 
+        生成AIプロバイダーのAPIキーは使用しません。
         Supabaseの強いSecretキーはEdge Function内だけで使用し、RenderやGitHubには置きません。
         """
     )
