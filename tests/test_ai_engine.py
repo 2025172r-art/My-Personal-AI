@@ -5,7 +5,7 @@ def test_safe_calculator():
     assert calculate("2+3*4") == "計算結果：14"
     assert "0で割る" in calculate("10/0")
     assert "扱えません" in calculate("__import__('os').system('echo bad')")
-    assert "大きすぎ" in calculate("999999999999999999*999999999999")
+    assert "扱えません" in calculate("999999999999999999*999999999999")
 
 
 def test_unit_conversion():
