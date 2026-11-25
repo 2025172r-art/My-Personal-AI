@@ -20,7 +20,7 @@ Python + Streamlit + OpenAI Responses API + Supabase で作る、個人用AIエ�
 - アプリは情報収集・分析・文章作成を行います。メール送信、購入、投稿、データ削除などの外部への書き込み操作は実行しません。
 - アップロードされたファイルはテキスト抽出後にAIへ送られます。原本ファイルはデータベースに保存しません。機密情報をアップロードしないでください。
 - APIキーはコードに書かず、Streamlit Secretsだけに保存してください。
-- SupabaseのService Role / SecretキーはRLSを迂回する強いキーです。サーバー側Secrets以外に置かず、GitHubやブラウザへ公開しないでください。
+- SupabaseのSecret / Service RoleキーはRLSを迂回する強いキーです。サーバー側Secrets以外に置かず、GitHubやブラウザへ公開しないでください。
 - Streamlit Community Cloudで公開する前に APP_ACCESS_PASSWORD を設定してください。
 - SQLiteはローカル試作用です。クラウドの一時ファイルシステムでは永続保存が保証されないため、公開後はSupabaseを設定してください。
 - OpenAI API、音声、Web検索、ホスティングの利用は別料金になる場合があります。使用量上限を設定してください。
@@ -59,7 +59,8 @@ OPENAI_API_KEY = "..."
 OPENAI_MODEL = "gpt-6.2-sol"
 APP_ACCESS_PASSWORD = "..."
 SUPABASE_URL = "https://<project-ref>.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = "..."
+SUPABASE_SECRET_KEY = "..."  # Preferred server-side Secret key
+# Legacy alternative: SUPABASE_SERVICE_ROLE_KEY = "..."
 
 ## Streamlit Community Cloudへの公開
 
@@ -79,6 +80,6 @@ python -m pytest -q
 - OPENAI_MODEL: 任意。既定値 gpt-6.2-sol
 - APP_ACCESS_PASSWORD: 必須。個人利用向けアクセスパスワード
 - SUPABASE_URL: クラウドで推奨。Supabase Project URL
-- SUPABASE_SERVICE_ROLE_KEY: クラウドで推奨。サーバー側だけに保存する秘密キー
+- SUPABASE_SECRET_KEY: クラウドで推奨。サーバー側だけに保存するSecretキー（旧プロジェクトではSUPABASE_SERVICE_ROLE_KEYも利用可能）
 
 モデル・APIの使用可否・価格は変わることがあるため、OpenAI Platformで最新情報を確認してください。
