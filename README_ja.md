@@ -7,7 +7,7 @@ Python + Streamlit + OpenAI Responses API + Supabase で作る、個人用AIエ�
 - 日本語チャット
 - OpenAI Responses APIによる回答
 - Web検索（OpenAIの組み込み web_search ツール）
-- 長期記憶（Supabase。未設定の開発時はSQLite）
+- 長期記憶（Supabase Edge Function。未設定の開発時はSQLite）
 - 会話履歴（個人用固定IDで再読み込み後も同じ履歴を表示）
 - PDF / DOCX / TXT / MD / CSV / XLSX のテキスト抽出と分析
 - ブラウザのマイク入力、OpenAI音声文字起こし、Chrome標準の音声読み上げ
@@ -52,22 +52,30 @@ Python + Streamlit + OpenAI Responses API + Supabase で作る、個人用AIエ�
 
 1. 新しいSupabaseプロジェクトを作成します。既存の別用途プロジェクトは流用しないでください。
 2. SQL Editorで supabase/migrations/0001_init.sql を実行します。
-3. Project URL とサーバー側Secretキーを取得します。
+3. SupabaseのProject URLとPublishable Keyを取得します。強いSecretキーはEdge Function内でのみ使用します。
 4. Streamlit Community CloudのApp settings → Secretsに次を登録します。
 
 OPENAI_API_KEY = "..."
 OPENAI_MODEL = "gpt-6.2-sol"
 APP_ACCESS_PASSWORD = "..."
 SUPABASE_URL = "https://<project-ref>.supabase.co"
-SUPABASE_SECRET_KEY = "..."  # Preferred server-side Secret key
-# Legacy alternative: SUPABASE_SERVICE_ROLE_KEY = "..."
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_..."
+MEMORY_API_TOKEN = "サーバーが保持するランダムな認証トークン"
+
+## Renderへの公開
+
+1. RenderでGitHubリポジトリを選びます。
+2. `render.yaml` のBlueprint、またはPython Web Serviceとして作成します。
+3. `APP_ACCESS_PASSWORD` と `MEMORY_API_TOKEN` をSecretsとして設定します。
+4. OpenAI APIキーはRenderの環境変数に置くか、ログイン後の専用入力欄に入力します。専用入力欄を使う場合、キーは現在のStreamlitセッションのメモリにだけ保持されます。
+5. `SUPABASE_URL` と `SUPABASE_PUBLISHABLE_KEY` は設定済みの値を使います。
 
 ## Streamlit Community Cloudへの公開
 
 1. GitHubにプッシュしたリポジトリをStreamlit Community Cloudに接続します。
 2. app.py をエントリポイントとして選びます。
 3. App settings → Secretsに上記の値を設定します。
-4. アクセスパスワードを設定し、ログインできることを確認します。
+4. APP_ACCESS_PASSWORDを設定し、ログインできることを確認します。OpenAI APIキーはRenderの環境変数に設定するか、ログイン後の専用パスワード入力欄でそのセッションだけに設定できます。
 
 ## テスト
 
@@ -80,6 +88,7 @@ python -m pytest -q
 - OPENAI_MODEL: 任意。既定値 gpt-6.2-sol
 - APP_ACCESS_PASSWORD: 必須。個人利用向けアクセスパスワード
 - SUPABASE_URL: クラウドで推奨。Supabase Project URL
-- SUPABASE_SECRET_KEY: クラウドで推奨。サーバー側だけに保存するSecretキー（旧プロジェクトではSUPABASE_SERVICE_ROLE_KEYも利用可能）
+- SUPABASE_PUBLISHABLE_KEY: Edge Function呼び出し用の公開可能なキー
+- MEMORY_API_TOKEN: Edge Functionの単一アプリ用認証トークン（Renderの環境変数に保存）
 
 モデル・APIの使用可否・価格は変わることがあるため、OpenAI Platformで最新情報を確認してください。
