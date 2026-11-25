@@ -29,7 +29,7 @@ class MemoryStore:
     @classmethod
     def from_settings(cls) -> "MemoryStore":
         url = get_setting("SUPABASE_URL")
-        secret = get_setting("SUPABASE_SERVICE_ROLE_KEY")
+        secret = get_setting("SUPABASE_SECRET_KEY") or get_setting("SUPABASE_SERVICE_ROLE_KEY")
         if url and secret:
             from supabase import create_client
 
