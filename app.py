@@ -72,9 +72,9 @@ for key, default in {
 with st.sidebar:
     st.title("🧠 My Personal AI")
     st.caption("Chromebook / Windows / Mac 対応")
-    st.caption("外部の生成AI APIを使わないローカルモード")
+    st.caption("外部の生成AI APIを使わないローカルモード・複数依頼対応")
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
-    st.caption("AIエンジン: Python Local Engine v0.2.0")
+    st.caption("AIエンジン: Python Local Engine v0.3.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -272,7 +272,7 @@ with setup_tab:
     st.write("AI処理はPython内で実行します。Supabaseへの記憶保存のみクラウド通信を使います。")
     st.table(
         [
-            {"項目": "AIエンジン", "状態": "Python Local Engine v0.2.0（生成AI API不要）"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v0.3.0（生成AI API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -290,7 +290,7 @@ with setup_tab:
         Supabaseの強いSecretキーはEdge Function内だけで使用し、RenderやGitHubには置きません。
         """
     )
-    st.markdown("**現在のエンジン機能**\n\n- 日本語の基本会話とヘルプ\n- 安全な計算・単位変換\n- 日時・記憶検索\n- 資料の関連文検索・抽出的な要約\n- タスクの保存・削除\n- 目的別の計画作成\n\n**未対応**：自由な文章生成、最新Web検索、音声の自動文字起こし。")
+    st.markdown("**現在のエンジン機能**\n\n- 日本語の基本会話とヘルプ\n- 複数依頼の分割と順次回答\n- 安全な計算・複合単位変換\n- 日時・記憶検索\n- 資料の関連文検索・抽出的な要約\n- タスクの保存・削除\n- 目的別の計画作成\n\n**未対応**：自由な文章生成、任意の命令の完全理解、最新Web検索、音声の自動文字起こし。")
     st.caption("個人利用向けの初期版です。外部への送信・購入・投稿などは自動実行しません。")
 
 st.divider()
