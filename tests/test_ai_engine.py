@@ -247,3 +247,21 @@ def test_fermat_knowledge_has_priority_over_reference_retrieval():
     assert result["intent"] == "local_knowledge"
     assert "正の整数 x, y, z は存在しない" in result["answer"]
     search.assert_not_called()
+
+
+
+def test_private_queries_are_never_sent_to_reference_search():
+    with patch("ai_engine.search_wikipedia") as search:
+        result = LocalAIEngine().reply(
+            "私の住所と電話番号を調べて",
+            sovereign_mode=False,
+        )
+    assert result["intent"] == "private_or_sensitive"
+    assert "外部" in result["answer"]
+    search.assert_not_called()
+
+
+def test_reference_tool_is_not_listed_as_a_user_facing_capability():
+    capabilities = LocalAIEngine().capabilities()
+    assert not any("Wikipedia" in item for item in capabilities)
+    assert not any("参考資料を内部取得" in item for item in capabilities)
