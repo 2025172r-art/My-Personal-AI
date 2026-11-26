@@ -342,16 +342,16 @@ def _polynomial_node(node: ast.AST, depth: int = 0) -> tuple[float, float, float
                 raise ValueError("割る数は0以外の定数にしてください。")
             return tuple(value / right[0] for value in left)
         if isinstance(node.op, ast.Pow):
-            if any(abs(value) > 1e-12 for value in left[1:]):
-                raise ValueError("変数を含む式の指数は0、1、2だけ使えます。")
-            exponent = int(left[0])
-            if left[0] != exponent or exponent not in (0, 1, 2):
+            if any(abs(value) > 1e-12 for value in right[1:]):
+                raise ValueError("指数に変数は使えません。")
+            exponent = int(right[0])
+            if right[0] != exponent or exponent not in (0, 1, 2):
                 raise ValueError("指数は0、1、2だけ使えます。")
             if exponent == 0:
                 return (1.0, 0.0, 0.0)
             if exponent == 1:
-                return right
-            return _poly_multiply(right, right)
+                return left
+            return _poly_multiply(left, left)
     raise ValueError("対応していない式です。")
 
 
@@ -359,7 +359,7 @@ def solve_equation(request: str) -> str | None:
     """Solve linear/quadratic equations in x with a bounded AST parser."""
     text = (request or "").strip().lower().replace("＝", "=").replace("^", "**")
     text = re.sub(r"(を解いてください|を解いて|解いてください|解いて)$", "", text).strip()
-    if text.count("=") != 1 or not re.search(r"\\bx\\b", text):
+    if text.count("=") != 1 or not re.search(r"\bx\b", text):
         return None
     left_text, right_text = (part.strip() for part in text.split("=", 1))
     if not left_text or not right_text or len(text) > 180:
@@ -367,9 +367,9 @@ def solve_equation(request: str) -> str | None:
 
     # Support ordinary school notation such as 2x and 3(x+1).
     for name, value in (("left_text", left_text), ("right_text", right_text)):
-        value = re.sub(r"(?<=\\d)\\s*(?=x\\b)", "*", value)
-        value = re.sub(r"(?<=\\))\\s*(?=x\\b|\\()", "*", value)
-        value = re.sub(r"(?<=x)\\s*(?=\\()", "*", value)
+        value = re.sub(r"(?<=\d)\s*(?=x\b|\()", "*", value)
+        value = re.sub(r"(?<=\))\s*(?=x\b|\()", "*", value)
+        value = re.sub(r"(?<=x)\s*(?=\()", "*", value)
         if name == "left_text":
             left_text = value
         else:
@@ -395,32 +395,32 @@ def solve_equation(request: str) -> str | None:
     if abs(a) < epsilon:
         answer = -c / b
         return (
-            "**一次方程式の解**\\n"
-            f"整理すると {b:g}x + ({c:g}) = 0 です。\\n"
+            "**一次方程式の解**\n"
+            f"整理すると {b:g}x + ({c:g}) = 0 です。\n"
             f"x = -({c:g}) / {b:g} = {_format_number(answer)}"
         )
 
     discriminant = b * b - 4 * a * c
     if discriminant < -epsilon:
         return (
-            "**二次方程式の解**\\n"
-            f"判別式 D = b² - 4ac = {discriminant:g} です。\\n"
+            "**二次方程式の解**\n"
+            f"判別式 D = b² - 4ac = {discriminant:g} です。\n"
             "Dが0未満なので、実数の解はありません。"
         )
     if abs(discriminant) <= epsilon:
         root = -b / (2 * a)
         return (
-            "**二次方程式の解**\\n"
-            "判別式 D = 0 なので重解です。\\n"
+            "**二次方程式の解**\n"
+            "判別式 D = 0 なので重解です。\n"
             f"x = {_format_number(root)}"
         )
 
     root_d = math.sqrt(discriminant)
     roots = sorted(((-b - root_d) / (2 * a), (-b + root_d) / (2 * a)))
     return (
-        "**二次方程式の解**\\n"
-        f"判別式 D = b² - 4ac = {_format_number(discriminant)} です。\\n"
-        "解の公式 x = (-b ± √D) / 2a より、\\n"
+        "**二次方程式の解**\n"
+        f"判別式 D = b² - 4ac = {_format_number(discriminant)} です。\n"
+        "解の公式 x = (-b ± √D) / 2a より、\n"
         f"x = {_format_number(roots[0])} または x = {_format_number(roots[1])}"
     )
 
