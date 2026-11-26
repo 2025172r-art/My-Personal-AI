@@ -966,6 +966,74 @@ def solve_speed_distance_time(request: str) -> str | None:
     return None
 
 
+
+def solve_ohms_law(request: str) -> str | None:
+    """Solve one missing quantity in V=IR using explicit units."""
+    text = (request or "").replace("Ω", "ohm").replace("オーム", "ohm")
+    resistance = re.search(r"(\d+(?:\.\d+)?)\s*(?:ohm|ohms)", text, re.IGNORECASE)
+    current = re.search(r"(\d+(?:\.\d+)?)\s*A(?:$|[^a-z])", text, re.IGNORECASE)
+    voltage = re.search(r"(\d+(?:\.\d+)?)\s*V(?:$|[^a-z])", text, re.IGNORECASE)
+    if not (resistance and current and voltage):
+        if not (resistance and current or resistance and voltage or current and voltage):
+            return None
+
+    r_value = float(resistance.group(1)) if resistance else None
+    i_value = float(current.group(1)) if current else None
+    v_value = float(voltage.group(1)) if voltage else None
+
+    if r_value is not None and i_value is not None and v_value is None and any(word in text for word in ("電圧", "vを", "求め")):
+        result = r_value * i_value
+        return f"**オームの法則**\nV = IR = {r_value:g} × {i_value:g}\n答え：{_format_number(result)} V"
+    if v_value is not None and r_value is not None and i_value is None and any(word in text for word in ("電流", "iを", "求め")):
+        if r_value == 0:
+            return "抵抗が0Ωなので、この条件では電流を計算できません。"
+        result = v_value / r_value
+        return f"**オームの法則**\nI = V ÷ R = {v_value:g} ÷ {r_value:g}\n答え：{_format_number(result)} A"
+    if v_value is not None and i_value is not None and r_value is None and any(word in text for word in ("抵抗", "rを", "求め")):
+        if i_value == 0:
+            return "電流が0Aなので、この条件では抵抗を計算できません。"
+        result = v_value / i_value
+        return f"**オームの法則**\nR = V ÷ I = {v_value:g} ÷ {i_value:g}\n答え：{_format_number(result)} Ω"
+    return None
+
+
+def solve_density(request: str) -> str | None:
+    """Solve mass, volume, or density when units are explicitly supplied."""
+    text = (request or "").replace("³", "3").replace("立方センチ", "cm3").replace("㎤", "cm3")
+    mass = re.search(r"質量\s*(\d+(?:\.\d+)?)\s*g", text)
+    volume = re.search(r"体積\s*(\d+(?:\.\d+)?)\s*cm3", text)
+    density = re.search(r"密度\s*(\d+(?:\.\d+)?)\s*g\s*/\s*cm3", text)
+    if mass and volume and any(word in text for word in ("密度", "求め")):
+        m_value, v_value = float(mass.group(1)), float(volume.group(1))
+        if v_value == 0:
+            return "体積が0なので密度を計算できません。"
+        result = m_value / v_value
+        return (
+            "**密度の計算**\n"
+            f"密度 = 質量 ÷ 体積 = {m_value:g} ÷ {v_value:g}\n"
+            f"答え：{_format_number(result)} g/cm³"
+        )
+    if density and volume and any(word in text for word in ("質量", "求め")):
+        d_value, v_value = float(density.group(1)), float(volume.group(1))
+        result = d_value * v_value
+        return (
+            "**質量の計算**\n"
+            f"質量 = 密度 × 体積 = {d_value:g} × {v_value:g}\n"
+            f"答え：{_format_number(result)} g"
+        )
+    if density and mass and any(word in text for word in ("体積", "求め")):
+        d_value, m_value = float(density.group(1)), float(mass.group(1))
+        if d_value == 0:
+            return "密度が0なので体積を計算できません。"
+        result = m_value / d_value
+        return (
+            "**体積の計算**\n"
+            f"体積 = 質量 ÷ 密度 = {m_value:g} ÷ {d_value:g}\n"
+            f"答え：{_format_number(result)} cm³"
+        )
+    return None
+
+
 def _tokens(text: str) -> set[str]:
     normalized = text.lower()
     tokens = set(re.findall(r"[a-z0-9_]{2,}|[ぁ-んァ-ン一-龥]+", normalized))
@@ -1319,6 +1387,10 @@ def analyze_question(text: str) -> dict[str, Any]:
         return {"kind": "percentage", "needs_reference": False, "needs_live_data": False}
     if any(cue in normalized for cue in ("円の面積", "円周", "長方形の面積", "三角形の面積")):
         return {"kind": "geometry", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("密度", "質量", "体積")) and ("g" in normalized or "cm" in normalized):
+        return {"kind": "density", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("電圧", "電流", "抵抗")) and ("ohm" in normalized or "Ω" in text or "オーム" in normalized):
+        return {"kind": "electric_circuit", "needs_reference": False, "needs_live_data": False}
     if any(cue in normalized for cue in ("時速", "速さ", "距離", "何時間")) and any(cue in normalized for cue in ("進む", "移動", "走る", "求め")):
         return {"kind": "motion_problem", "needs_reference": False, "needs_live_data": False}
 
@@ -1411,6 +1483,7 @@ class LocalAIEngine:
             "平均・中央値・最頻値・分散・標準偏差の統計処理",
             "円・長方形・三角形の面積と円周の計算",
             "速さ・距離・時間の文章題",
+            "オームの法則と密度の文章題",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
 
@@ -1423,6 +1496,8 @@ class LocalAIEngine:
             {"name": "statistics_engine", "description": "平均・中央値・最頻値・分散・標準偏差"},
             {"name": "geometry_solver", "description": "円・長方形・三角形の面積や円周"},
             {"name": "motion_solver", "description": "速さ・距離・時間の文章題"},
+            {"name": "ohms_law_solver", "description": "電圧・電流・抵抗から未知量を計算"},
+            {"name": "density_solver", "description": "質量・体積・密度の関係を計算"},
             {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換。計算式にも対応"},
             {"name": "japan_clock", "description": "日本時間の日付と時刻"},
             {"name": "memory_search", "description": "保存済みの記憶をキーワード検索"},
@@ -1455,6 +1530,8 @@ class LocalAIEngine:
             "percentage_solver": True,
             "geometry_solver": True,
             "motion_solver": True,
+            "ohms_law_solver": True,
+            "density_solver": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -1529,6 +1606,24 @@ class LocalAIEngine:
                 "plan": [],
                 "intent": "equation_solving",
                 "tools_used": ["equation_solver"],
+            }
+
+        ohms_answer = solve_ohms_law(text)
+        if ohms_answer:
+            return {
+                "answer": ohms_answer,
+                "plan": [],
+                "intent": "electric_circuit_calculation",
+                "tools_used": ["ohms_law_solver", "self_check"],
+            }
+
+        density_answer = solve_density(text)
+        if density_answer:
+            return {
+                "answer": density_answer,
+                "plan": [],
+                "intent": "density_calculation",
+                "tools_used": ["density_solver", "self_check"],
             }
 
         percentage_answer = solve_percentage(text)
