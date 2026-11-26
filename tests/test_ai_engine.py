@@ -50,8 +50,13 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.8.0"
+    assert engine.health()["version"] == "0.9.0"
     assert engine.health()["equation_solver"] is True
+    assert engine.health()["statistics_engine"] is True
+    assert engine.health()["percentage_solver"] is True
+    assert engine.health()["geometry_solver"] is True
+    assert engine.health()["ohms_law_solver"] is True
+    assert engine.health()["density_solver"] is True
     assert engine.health()["reference_search"] is True
     assert engine.health()["automatic_tool_selection"] is True
     assert engine.health()["question_analysis"] is True
@@ -542,3 +547,25 @@ def test_context_graph_resolves_statistics_followup():
     answer = LocalAIEngine().reply("それぞれの違いは？", history=history, sovereign_mode=False)
     assert answer["intent"] == "contextual_reasoning"
     assert "中央値" in answer["answer"]
+
+
+
+def test_v09_context_graph_examples():
+    history = [
+        {"role": "user", "content": "確率とは？"},
+        {"role": "assistant", "content": "確率は0から1で表します。"},
+    ]
+    result = LocalAIEngine().reply(
+        "具体例を教えて", history=history, sovereign_mode=False
+    )
+    assert result["intent"] == "contextual_reasoning"
+    assert "サイコロ" in result["answer"]
+
+
+def test_percentage_and_geometry_do_not_emit_non_finite_values():
+    assert ai_engine.solve_percentage("999999999999999999999999の99%") is None
+    assert ai_engine.solve_geometry("半径999999999999999999999999mの円の面積") == "計算結果が大きすぎます。"
+
+
+def test_solver_returns_none_for_nonmatching_statistics_prompt():
+    assert ai_engine.solve_statistics("東京の天気を教えて") is None
