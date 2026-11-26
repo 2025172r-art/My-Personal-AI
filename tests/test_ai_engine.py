@@ -50,8 +50,13 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.8.0"
+    assert engine.health()["version"] == "0.9.0"
     assert engine.health()["equation_solver"] is True
+    assert engine.health()["statistics_engine"] is True
+    assert engine.health()["percentage_solver"] is True
+    assert engine.health()["geometry_solver"] is True
+    assert engine.health()["ohms_law_solver"] is True
+    assert engine.health()["density_solver"] is True
     assert engine.health()["reference_search"] is True
     assert engine.health()["automatic_tool_selection"] is True
     assert engine.health()["question_analysis"] is True
@@ -439,3 +444,193 @@ def test_reply_uses_history_instead_of_discarding_it():
     )
     assert result["intent"] == "contextual_reasoning"
     assert "4Ω" in result["answer"]
+
+
+
+def test_percentage_calculator():
+    assert "答え：30" in ai_engine.solve_percentage("150の20%")
+    assert "答え：320" in ai_engine.solve_percentage("400円の20%引き")
+    assert "答え：220" in ai_engine.solve_percentage("200を10%増やす")
+    assert "答え：40%" in ai_engine.solve_percentage("80は200の何%？")
+
+
+def test_statistics_engine():
+    answer = ai_engine.solve_statistics("平均値と中央値を求めて 1, 2, 2, 5")
+    assert answer is not None
+    assert "平均値：2.5" in answer
+    assert "中央値：2" in answer
+    assert "最頻値：2" in answer
+    assert "範囲：4" in answer
+    assert "分散（母分散）：2.25" in answer
+    assert "標準偏差（母標準偏差）：1.5" in answer
+
+
+def test_geometry_solver():
+    circle = ai_engine.solve_geometry("半径3cmの円の面積を求めて")
+    assert circle is not None
+    assert "円の面積" in circle
+    assert "28.2743" in circle or "28.274" in circle
+
+    rectangle = ai_engine.solve_geometry("たて5cm、よこ3cmの長方形の面積")
+    assert rectangle is not None
+    assert "答え：15cm²" in rectangle
+
+    triangle = ai_engine.solve_geometry("底辺8cm、高さ5cmの三角形の面積")
+    assert triangle is not None
+    assert "答え：20cm²" in triangle
+
+
+def test_speed_distance_time_solver():
+    distance = ai_engine.solve_speed_distance_time("時速60kmで2時間進む距離を求めて")
+    assert distance is not None
+    assert "答え：120 km" in distance
+
+    speed = ai_engine.solve_speed_distance_time("120kmを2時間で移動した速さ")
+    assert speed is not None
+    assert "答え：時速60 km" in speed
+
+
+def test_ohms_law_solver():
+    voltage = ai_engine.solve_ohms_law("抵抗4Ω、電流2Aで電圧を求めて")
+    assert voltage is not None
+    assert "答え：8 V" in voltage
+
+    current = ai_engine.solve_ohms_law("電圧12V、抵抗4Ωから電流を求めて")
+    assert current is not None
+    assert "答え：3 A" in current
+
+    resistance = ai_engine.solve_ohms_law("電圧12V、電流3Aから抵抗を求めて")
+    assert resistance is not None
+    assert "答え：4 Ω" in resistance
+
+
+def test_density_solver():
+    density = ai_engine.solve_density("質量20g、体積5cm³の密度を求めて")
+    assert density is not None
+    assert "答え：4 g/cm³" in density
+
+    mass = ai_engine.solve_density("密度4g/cm³、体積5cm³の質量を求めて")
+    assert mass is not None
+    assert "答え：20 g" in mass
+
+    volume = ai_engine.solve_density("密度4g/cm³、質量20gの体積を求めて")
+    assert volume is not None
+    assert "答え：5 cm³" in volume
+
+
+def test_advanced_solver_routing():
+    engine = LocalAIEngine()
+    assert engine.reply("400円の20%引き")["intent"] == "percentage_calculation"
+    assert engine.reply("平均値を求めて 1, 2, 3")["intent"] == "statistics"
+    assert engine.reply("半径3cmの円の面積")["intent"] == "geometry"
+    assert engine.reply("時速60kmで2時間進む距離")["intent"] == "motion_problem"
+    assert engine.reply("抵抗4Ω、電流2Aで電圧を求めて")["intent"] == "electric_circuit_calculation"
+    assert engine.reply("質量20g、体積5cm³の密度を求めて")["intent"] == "density_calculation"
+
+
+def test_expanded_knowledge_library_v09():
+    engine = LocalAIEngine()
+    assert "傾き" in engine.reply("一次関数とは？")["answer"]
+    assert "放物線" in engine.reply("二次関数とは？")["answer"]
+    assert "1は素数ではありません" in engine.reply("素数とは？")["answer"]
+    assert "百分率" in engine.reply("割合とは？")["answer"]
+    assert "ATP" in engine.reply("ミトコンドリアとは？")["answer"]
+    assert "ひずみ" in engine.reply("地震が起きる仕組みは？")["answer"]
+    assert "需要" in engine.reply("需要と供給とは？")["answer"]
+
+
+def test_context_graph_resolves_statistics_followup():
+    history = [
+        {"role": "user", "content": "平均値・中央値・最頻値とは？"},
+        {"role": "assistant", "content": "平均値・中央値・最頻値はデータの代表値です。"},
+    ]
+    answer = LocalAIEngine().reply("それぞれの違いは？", history=history, sovereign_mode=False)
+    assert answer["intent"] == "contextual_reasoning"
+    assert "中央値" in answer["answer"]
+
+
+
+def test_v09_context_graph_examples():
+    history = [
+        {"role": "user", "content": "確率とは？"},
+        {"role": "assistant", "content": "確率は0から1で表します。"},
+    ]
+    result = LocalAIEngine().reply(
+        "具体例を教えて", history=history, sovereign_mode=False
+    )
+    assert result["intent"] == "contextual_reasoning"
+    assert "サイコロ" in result["answer"]
+
+
+def test_percentage_and_geometry_do_not_emit_non_finite_values():
+    assert ai_engine.solve_percentage("999999999999999999999999の99%") is None
+    assert ai_engine.solve_geometry("半径999999999999999999999999mの円の面積") == "計算結果が大きすぎます。"
+
+
+def test_solver_returns_none_for_nonmatching_statistics_prompt():
+    assert ai_engine.solve_statistics("東京の天気を教えて") is None
+
+
+
+def test_combinations_and_permutations():
+    combination = ai_engine.solve_combinatorics("5C2を計算して")
+    assert combination is not None
+    assert "答え：10" in combination
+
+    permutation = ai_engine.solve_combinatorics("5個から2個を選んで並べる順列")
+    assert permutation is not None
+    assert "答え：20" in permutation
+
+
+def test_basic_probability_solver():
+    even = ai_engine.solve_simple_probability("サイコロを1回振って偶数が出る確率")
+    assert even is not None
+    assert "3/6 = 1/2" in even
+    assert "50%" in even
+
+    coin = ai_engine.solve_simple_probability("コインで表が出る確率")
+    assert coin is not None
+    assert "1/2 = 50%" in coin
+
+
+def test_new_reasoning_modules_are_auto_selected():
+    engine = LocalAIEngine()
+    assert engine.reply("5C2を計算して")["intent"] == "combinatorics"
+    assert engine.reply("サイコロを1回振って偶数が出る確率")["intent"] == "probability"
+
+
+def test_new_computing_knowledge():
+    engine = LocalAIEngine()
+    assert "ソフトウェア同士" in engine.reply("APIとは？")["answer"]
+    assert "commit" in engine.reply("Gitとは？")["answer"]
+    assert "SELECT" in engine.reply("SQLとは？")["answer"]
+    assert "過学習" in engine.reply("過学習とは？")["answer"]
+    assert "多数の層" in engine.reply("深層学習とは？")["answer"]
+    assert "RAM" in engine.reply("CPUとメモリの違いは？")["answer"]
+
+
+
+def test_router_labels_combinatorics_and_probability():
+    assert ai_engine.analyze_question("5C2を計算して")["kind"] == "combinatorics"
+    assert ai_engine.analyze_question("サイコロで偶数が出る確率")["kind"] == "probability"
+
+
+def test_context_graph_handles_api_followup():
+    history = [
+        {"role": "user", "content": "APIとは？"},
+        {"role": "assistant", "content": "APIはソフトウェア同士をつなぐ窓口です。"},
+    ]
+    result = LocalAIEngine().reply(
+        "具体例を教えて", history=history, sovereign_mode=False
+    )
+    assert result["intent"] == "contextual_reasoning"
+    assert "天気アプリ" in result["answer"] or "API" in result["answer"]
+
+
+def test_all_v09_tools_are_advertised_in_health():
+    health = LocalAIEngine().health()
+    assert health["version"] == "0.9.0"
+    assert health["combinatorics_solver"] is True
+    assert health["probability_solver"] is True
+    assert health["ohms_law_solver"] is True
+    assert health["density_solver"] is True

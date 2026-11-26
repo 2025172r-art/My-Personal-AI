@@ -4,6 +4,7 @@ import ast
 import math
 import operator
 import re
+import statistics
 import time
 from collections import Counter
 from datetime import datetime
@@ -305,6 +306,234 @@ KNOWLEDGE = [
             "例えば公平な6面サイコロで偶数が出る確率は3/6=1/2です。"
         ),
     },
+    {
+        "title": "一次関数とは",
+        "triggers": ["一次関数とは", "一次関数って何", "y=ax+bとは"],
+        "answer": (
+            "一次関数は、一般に y=ax+b と表される関数です。aは傾き、bは切片です。"
+            "xが一定量増えると、yは常に同じ割合で増減します。"
+            "グラフは直線になり、二つの点が分かれば傾きと式を求められます。"
+        ),
+    },
+    {
+        "title": "二次関数とは",
+        "triggers": ["二次関数とは", "二次関数って何", "y=ax^2とは"],
+        "answer": (
+            "二次関数は、一般に y=ax²+bx+c（aは0ではない）と表される関数です。"
+            "グラフは放物線になります。頂点や軸、aの符号によって開く向きや形が決まります。"
+            "二次方程式の解は、グラフとx軸の交点に対応します。"
+        ),
+    },
+    {
+        "title": "素数とは",
+        "triggers": ["素数とは", "素数って何", "素数の意味"],
+        "answer": (
+            "素数は、1より大きい自然数で、正の約数が1とその数自身の二つだけの数です。"
+            "2、3、5、7、11などが素数です。1は素数ではありません。"
+        ),
+    },
+    {
+        "title": "割合と百分率",
+        "triggers": ["割合とは", "百分率とは", "パーセントとは", "割合の求め方"],
+        "answer": (
+            "割合は、比べる量が基準となる量の何倍かを表します。"
+            "割合＝比べる量÷基準量です。百分率（％）は割合を100倍して表します。"
+            "例えば、20人のうち5人なら、5÷20=0.25なので25％です。"
+        ),
+    },
+    {
+        "title": "速さ・距離・時間",
+        "triggers": ["速さとは", "速さの公式", "距離と時間の関係"],
+        "answer": (
+            "速さ＝距離÷時間です。距離＝速さ×時間、時間＝距離÷速さでも求められます。"
+            "例えば時速60kmで2時間進むと、距離は60×2=120kmです。"
+            "計算するときは、距離と時間の単位をそろえることが大切です。"
+        ),
+    },
+    {
+        "title": "密度とは",
+        "triggers": ["密度とは", "密度って何", "密度の公式"],
+        "answer": (
+            "密度は、物質の単位体積あたりの質量です。密度＝質量÷体積で求めます。"
+            "例えば質量が20g、体積が5cm³なら密度は4g/cm³です。"
+            "同じ体積なら、密度が大きい物質ほど質量が大きくなります。"
+        ),
+    },
+    {
+        "title": "酸とアルカリ",
+        "triggers": ["酸とアルカリ", "酸性とは", "アルカリ性とは", "phとは"],
+        "answer": (
+            "水溶液の酸性・中性・アルカリ性は、主に水素イオンに関係する性質で表されます。"
+            "一般に25℃付近ではpH7が中性、7より小さいと酸性、7より大きいとアルカリ性です。"
+            "pHは温度などの条件にも関係するため、数値の解釈では条件を確認します。"
+        ),
+    },
+    {
+        "title": "細胞とは",
+        "triggers": ["細胞とは", "細胞って何", "細胞の構造"],
+        "answer": (
+            "細胞は、多くの生物の体をつくる基本単位です。"
+            "細胞膜が内外を隔て、細胞質ではさまざまな化学反応が進みます。"
+            "真核細胞には核やミトコンドリアなどの細胞小器官があります。"
+        ),
+    },
+    {
+        "title": "ミトコンドリアとは",
+        "triggers": ["ミトコンドリアとは", "ミトコンドリアって何"],
+        "answer": (
+            "ミトコンドリアは真核細胞にある細胞小器官で、細胞呼吸を通じてATPをつくる重要な役割を持ちます。"
+            "ATPは細胞がさまざまな活動に使うエネルギーの受け渡しに関わる分子です。"
+        ),
+    },
+    {
+        "title": "地震が起きる仕組み",
+        "triggers": ["地震が起きる仕組み", "地震はなぜ起きる", "地震の原因"],
+        "answer": (
+            "地震の多くは、地下の岩盤に力が加わってひずみがたまり、断層などが急にずれ動くことで発生します。"
+            "プレート境界ではプレートの沈み込みや横ずれなどが地震の原因になります。"
+            "地震の規模（マグニチュード）と、ある場所での揺れの強さ（震度）は別の指標です。"
+        ),
+    },
+    {
+        "title": "気象と気候の違い",
+        "triggers": ["気象と気候の違い", "天気と気候の違い", "気候とは"],
+        "answer": (
+            "気象は、ある時点・場所での気温、雨、風など大気の状態や変化です。"
+            "気候は、長い期間にわたる気象の平均的な特徴や変動傾向を指します。"
+            "今日の天気と、その地域の長期的な気候は区別して考えます。"
+        ),
+    },
+    {
+        "title": "波の性質",
+        "triggers": ["波とは", "波の性質", "周波数と波長"],
+        "answer": (
+            "波は、振動や変化が空間を伝わる現象です。"
+            "波長は波の同じ位相にある点どうしの距離、周波数は1秒あたりの振動回数です。"
+            "波の速さは、速さ＝波長×周波数で表せます。"
+        ),
+    },
+    {
+        "title": "情報の暗号化",
+        "triggers": ["暗号化とは", "暗号とは", "公開鍵暗号とは"],
+        "answer": (
+            "暗号化は、情報を鍵などを使って、許可されていない人が読みにくい形式へ変換する技術です。"
+            "共通鍵暗号は暗号化と復号に同じ鍵を使い、公開鍵暗号は公開鍵と秘密鍵の組を使います。"
+            "実際の安全性は方式だけでなく、鍵の管理や実装にも左右されます。"
+        ),
+    },
+    {
+        "title": "再帰とは",
+        "triggers": ["再帰とは", "再帰関数とは", "recursionとは"],
+        "answer": (
+            "再帰は、関数などが自分自身を呼び出して問題を小さく分ける考え方です。"
+            "正しく動かすには、呼び出しを止める基底条件と、問題を小さくする再帰ステップが必要です。"
+            "階乗や木構造の探索などに使われます。"
+        ),
+    },
+    {
+        "title": "計算量とは",
+        "triggers": ["計算量とは", "時間計算量とは", "ビッグオーとは", "big oとは"],
+        "answer": (
+            "計算量は、入力サイズが大きくなったとき、アルゴリズムに必要な時間やメモリがどう増えるかを表します。"
+            "Big O記法は増加の上限の傾向を表す方法で、O(1)、O(n)、O(n log n)、O(n²)などがあります。"
+            "実際の速さは定数倍やデータの形にも影響されます。"
+        ),
+    },
+    {
+        "title": "需要と供給",
+        "triggers": ["需要と供給", "需要とは", "供給とは", "市場価格の仕組み"],
+        "answer": (
+            "需要は、消費者がある価格で買いたいと思う量、供給は生産者がある価格で売りたいと思う量です。"
+            "ほかの条件が同じなら、価格が上がると需要量は減り、供給量は増える傾向があります。"
+            "需要と供給が一致する点が市場均衡の考え方です。"
+        ),
+    },
+    {
+        "title": "民主主義とは",
+        "triggers": ["民主主義とは", "民主主義って何"],
+        "answer": (
+            "民主主義は、政治の決定に市民が参加し、権力を正当化・統制する考え方や制度です。"
+            "選挙だけでなく、法の支配、基本的人権、少数者の権利、情報公開なども重要な要素です。"
+            "制度や運用の形は国や歴史によって異なります。"
+        ),
+    },
+    {
+        "title": "生産者・消費者・分解者",
+        "triggers": ["生産者とは", "消費者とは", "分解者とは"],
+        "answer": (
+            "生態系では、植物などの生産者が光などのエネルギーを使って有機物をつくります。"
+            "消費者はほかの生物などを食べて有機物を得ます。"
+            "分解者は遺体や排出物などを分解し、物質を環境へ戻す働きをします。"
+        ),
+    },
+    {
+        "title": "APIとは",
+        "triggers": ["apiとは", "apiって何", "application programming interface"],
+        "answer": (
+            "APIは、ソフトウェア同士が機能やデータをやり取りするための窓口・取り決めです。"
+            "例えば、アプリが地図サービスのAPIを呼び出して地図情報を取得することがあります。"
+            "APIを使うと、すべての機能を一から作らずに他のソフトウェアの機能を利用できます。"
+        ),
+    },
+    {
+        "title": "HTTPとは",
+        "triggers": ["httpとは", "httpsとは", "httpとhttpsの違い"],
+        "answer": (
+            "HTTPは、Webブラウザーとサーバーなどがリクエストとレスポンスを交換するための通信規約です。"
+            "HTTPSはHTTPの通信をTLSで保護し、通信内容の盗み見や改ざん、接続先の偽装を防ぎやすくします。"
+        ),
+    },
+    {
+        "title": "Gitとは",
+        "triggers": ["gitとは", "gitって何", "バージョン管理とは"],
+        "answer": (
+            "Gitは、ファイルの変更履歴を記録し、過去の状態を確認したり複数人で変更を統合したりできる分散型バージョン管理システムです。"
+            "commitは変更の記録、branchは並行作業のための枝、mergeは変更を統合する操作です。"
+        ),
+    },
+    {
+        "title": "SQLとは",
+        "triggers": ["sqlとは", "sqlって何", "select文とは"],
+        "answer": (
+            "SQLは、リレーショナルデータベースのデータを検索・追加・更新・削除したり、表の構造を管理したりするための言語です。"
+            "SELECTで検索、INSERTで追加、UPDATEで更新、DELETEで削除します。"
+            "実際の操作では、権限とWHERE条件を確認して誤更新を防ぎます。"
+        ),
+    },
+    {
+        "title": "教師あり学習と教師なし学習",
+        "triggers": ["教師あり学習とは", "教師なし学習とは", "教師ありと教師なしの違い"],
+        "answer": (
+            "教師あり学習は、入力と正解ラベルの組を使って予測モデルを学ぶ方法です。分類や数値予測などに使われます。"
+            "教師なし学習は、正解ラベルがないデータから、似たもののまとまりや特徴的な構造を見つけます。"
+            "どちらも学習に使っていないデータで性能を評価することが重要です。"
+        ),
+    },
+    {
+        "title": "過学習とは",
+        "triggers": ["過学習とは", "オーバーフィッティングとは", "overfittingとは"],
+        "answer": (
+            "過学習は、モデルが訓練データに過度に適合し、未知のデータでは予測性能が下がる状態です。"
+            "検証データで性能を確認し、モデルを単純化する、データを増やす、正則化を使うなどで抑えることがあります。"
+        ),
+    },
+    {
+        "title": "深層学習とは",
+        "triggers": ["深層学習とは", "ディープラーニングとは", "deep learningとは"],
+        "answer": (
+            "深層学習（ディープラーニング）は、多数の層を持つニューラルネットワークをデータから学習させる機械学習の方法です。"
+            "画像、音声、文章などの複雑なパターンを扱えますが、多くの場合、大量のデータと計算資源が必要です。"
+        ),
+    },
+    {
+        "title": "CPUとメモリの違い",
+        "triggers": ["cpuとメモリの違い", "cpuとは", "ramとは", "メモリとは"],
+        "answer": (
+            "CPUは命令を実行し、計算や制御を行う装置です。"
+            "メモリ（RAM）は、CPUが処理中に使うデータやプログラムを一時的に置く高速な作業領域です。"
+            "一般にRAMの内容は電源を切ると保持されず、SSDなどのストレージとは役割が異なります。"
+        ),
+    },
 ]
 
 STOP_WORDS = {
@@ -344,11 +573,61 @@ CONCEPT_GRAPH: dict[str, dict[str, str]] = {
         "用途": "検索、並べ替え、経路探索、データ圧縮、スケジュール作成など、明確な手順が必要な問題に使います。",
         "例": "辞書の単語を探すとき、順番に確認する方法や、範囲を半分ずつ絞る二分探索などがあります。",
     },
+    "ピタゴラスの定理": {
+        "仕組み": "直角三角形の二つの直角をはさむ辺を二乗して足すと、斜辺の二乗になります。a²+b²=c²です。",
+        "例": "辺が3と4なら、斜辺は√(9+16)=5です。",
+        "用途": "直角三角形の辺や、座標平面上の二点間の距離を求めるのに使います。",
+    },
+    "平均値・中央値・最頻値": {
+        "仕組み": "平均値は合計を個数で割った値、中央値は並べたときの中央、最頻値は最も多く現れる値です。",
+        "例": "1, 2, 2, 9では平均値3.5、中央値2、最頻値2です。",
+        "用途": "データの中心や代表的な値を比べるときに使います。外れ値がある場合は中央値も確認します。",
+    },
+    "確率": {
+        "仕組み": "同様に確からしい結果なら、確率は条件に合う場合の数を全場合数で割って求めます。",
+        "例": "公平な6面サイコロで偶数が出る確率は3/6=1/2です。",
+        "用途": "偶然の起こりやすさや、複数の結果の可能性を比較します。",
+    },
+    "速さ・距離・時間": {
+        "仕組み": "速さ=距離÷時間、距離=速さ×時間、時間=距離÷速さです。",
+        "例": "時速60kmで2時間進むと60×2=120kmです。",
+        "用途": "移動の所要時間、移動距離、平均速度を求めます。",
+    },
+    "需要と供給": {
+        "仕組み": "需要は買いたい量、供給は売りたい量です。市場では価格などを通じて両者が調整されます。",
+        "例": "ほかの条件が同じなら、価格が上がると需要量は減り、供給量は増える傾向があります。",
+        "用途": "市場価格や商品の取引量の変化を考えるときに使います。",
+    },
+    "一次関数": {
+        "仕組み": "y=ax+bのaが傾き、bが切片です。xが1増えるごとにyはaだけ変化します。",
+        "例": "y=2x+1では、x=0のときy=1、x=1のときy=3です。",
+        "用途": "一定の割合で増減する関係を表したり、二つの量の関係を予測したりします。",
+    },
+    "二次関数": {
+        "仕組み": "y=ax²+bx+cで表され、グラフは放物線になります。aの符号で上向き・下向きが決まります。",
+        "例": "y=x²は頂点が(0,0)で、左右対称の放物線です。",
+        "用途": "投げ上げた物体の理想化した軌道や、最大・最小を考える問題などに使われます。",
+    },
+    "API": {
+        "仕組み": "APIは、別のソフトウェアが決められた形式で機能やデータを要求できる窓口です。",
+        "例": "天気アプリが天気サービスのAPIに地域を送り、予報データを受け取ることがあります。",
+        "用途": "複数のサービスやプログラムを連携させるときに使います。",
+    },
+    "Git": {
+        "仕組み": "Gitはファイルの変更をコミットとして記録し、ブランチで並行作業し、マージで変更を統合します。",
+        "例": "新機能用のブランチで変更とテストを行い、レビュー後にmainへ統合します。",
+        "用途": "履歴管理、共同開発、変更の比較や復元に使います。",
+    },
+    "深層学習": {
+        "仕組み": "多層のニューラルネットワークが、入力から得た予測と正解の誤差を使って重みを調整します。",
+        "例": "画像データから物体の特徴を学習し、画像分類を行うモデルがあります。",
+        "用途": "画像・音声・文章など、複雑なパターンを扱う機械学習に使われます。",
+    },
 }
 FOLLOWUP_CUES = (
     "それは", "それが", "それを", "それの", "それって", "これは", "これが",
     "この仕組み", "その理由", "なぜ", "どうして", "何に使", "用途",
-    "例を", "例えば", "もっと詳しく", "もう少し詳しく", "続き",
+    "例を", "例えば", "それぞれ", "違いは", "どう違う", "もっと詳しく", "もう少し詳しく", "続き",
 )
 
 
@@ -624,6 +903,332 @@ def calculate(expression: str) -> str:
     if isinstance(result, float) and result.is_integer():
         result = int(result)
     return f"計算結果：{result}"
+
+
+
+
+def solve_combinatorics(request: str) -> str | None:
+    """Compute combinations/permutations for bounded school-level inputs."""
+    text = (request or "").replace("Ｃ", "C").replace("ｃ", "c")
+    match = re.search(r"(\d+)\s*[cC]\s*(\d+)", text)
+    if not match:
+        match = re.search(r"(\d+)\s*個から\s*(\d+)\s*個(?:を)?\s*選(?:ぶ|んで)", text)
+    if not match:
+        return None
+    n, r = map(int, match.groups())
+    if n > 1000 or r > n:
+        return "組合せは 0 ≤ r ≤ n ≤ 1000 の範囲で計算できます。"
+    is_permutation = any(word in text for word in ("順列", "並べる", "順番"))
+    result = math.perm(n, r) if is_permutation else math.comb(n, r)
+    label = "順列" if is_permutation else "組合せ"
+    formula = f"{n}P{r}" if is_permutation else f"{n}C{r}"
+    return f"**{label}の計算**\n{formula} = {result}\n答え：{result}"
+
+
+def solve_simple_probability(request: str) -> str | None:
+    """Solve transparent fair-die and fair-coin probability examples."""
+    text = (request or "").replace("１", "1").replace("２", "2").replace("３", "3")
+    if "サイコロ" in text and any(word in text for word in ("確率", "可能性")):
+        favorable = None
+        label = ""
+        if "偶数" in text:
+            favorable, label = 3, "偶数"
+        elif "奇数" in text:
+            favorable, label = 3, "奇数"
+        elif re.search(r"([1-6])\s*が出る", text):
+            face = re.search(r"([1-6])\s*が出る", text).group(1)
+            favorable, label = 1, f"{face}が出る"
+        elif re.search(r"([1-6])\s*以下", text):
+            face = int(re.search(r"([1-6])\s*以下", text).group(1))
+            favorable, label = face, f"{face}以下"
+        elif re.search(r"([1-6])\s*以上", text):
+            face = int(re.search(r"([1-6])\s*以上", text).group(1))
+            favorable, label = 7 - face, f"{face}以上"
+        if favorable is not None:
+            divisor = math.gcd(favorable, 6)
+            numerator, denominator = favorable // divisor, 6 // divisor
+            return (
+                f"**サイコロの確率：{label}**\n"
+                f"確率 = {favorable}/6 = {numerator}/{denominator}\n"
+                f"答え：約{_format_number(favorable / 6 * 100)}%"
+            )
+
+    if "コイン" in text and any(word in text for word in ("確率", "可能性")):
+        if "表" in text or "裏" in text:
+            return "**コインの確率**\n公平なコインでは表・裏は同じ確からしさです。\n確率 = 1/2 = 50%"
+    return None
+
+
+def _bounded_reasoning_values(*values: float, limit: float = 10**12) -> bool:
+    return all(math.isfinite(value) and abs(value) <= limit for value in values)
+
+
+def solve_percentage(request: str) -> str | None:
+    """Solve common percentage word problems with transparent arithmetic."""
+    text = (request or "").replace("，", ",").replace("％", "%").replace(",", "").strip()
+    number = r"(\d+(?:\.\d+)?)"
+
+    match = re.search(number + r"\s*(?:円|個|人|kg|g|m|km)?\s*の\s*" + number + r"\s*%", text)
+    if match and not re.match(r"\s*(引き|割引|値下げ)", text[match.end():]):
+        base, rate = map(float, match.groups())
+        result = base * rate / 100
+        if abs(result) <= 10**15:
+            return (
+                "**割合の計算**\n"
+                f"{_format_number(base)} × {_format_number(rate)} ÷ 100\n"
+                f"答え：{_format_number(result)}"
+            )
+
+    match = re.search(number + r"\s*%\s*の\s*" + number, text)
+    if match:
+        rate, base = map(float, match.groups())
+        result = base * rate / 100
+        if abs(result) <= 10**15:
+            return (
+                "**割合の計算**\n"
+                f"{_format_number(base)} × {_format_number(rate)} ÷ 100\n"
+                f"答え：{_format_number(result)}"
+            )
+
+    match = re.search(number + r"\s*(?:円|個|人)?\s*(?:を|の)\s*" + number + r"\s*%\s*(引き|割引|値下げ|増し|増やす|増加|上げる|上昇)", text)
+    if match:
+        base, rate = map(float, match.groups()[:2])
+        action = match.group(3)
+        factor = 1 - rate / 100 if any(word in action for word in ("引き", "割引", "値下げ")) else 1 + rate / 100
+        result = base * factor
+        label = "割引後" if factor < 1 else "増加後"
+        if abs(result) <= 10**15:
+            return (
+                f"**{label}の計算**\n"
+                f"{_format_number(base)} × {factor:g}\n"
+                f"答え：{_format_number(result)}"
+            )
+
+    match = re.search(number + r"\s*は\s*" + number + r"\s*の\s*何\s*%", text)
+    if match:
+        part, whole = map(float, match.groups())
+        if whole == 0:
+            return "基準となる量が0なので、割合を計算できません。"
+        result = part / whole * 100
+        return (
+            "**百分率の計算**\n"
+            f"{_format_number(part)} ÷ {_format_number(whole)} × 100\n"
+            f"答え：{_format_number(result)}%"
+        )
+    return None
+
+
+def solve_statistics(request: str) -> str | None:
+    """Calculate descriptive statistics for a short list of numeric data."""
+    text = (request or "").replace("，", ",")
+    cues = ("平均", "中央値", "最頻値", "標準偏差", "分散", "統計", "データの分析")
+    if not any(cue in text for cue in cues):
+        return None
+    values = [float(value) for value in re.findall(r"(?<![A-Za-z])[-+]?\d+(?:\.\d+)?", text)]
+    if len(values) < 2 or len(values) > 100:
+        return None
+    if any(not math.isfinite(value) or abs(value) > 10**12 for value in values):
+        return "データの値が大きすぎるか、数値として扱えません。"
+    mean_value = statistics.mean(values)
+    median_value = statistics.median(values)
+    modes = statistics.multimode(values)
+    mode_text = "なし（すべて同じ頻度）" if len(modes) == len(set(values)) == len(values) else "、".join(_format_number(value) for value in modes)
+    data_range = max(values) - min(values)
+    variance = statistics.pvariance(values)
+    stddev = statistics.pstdev(values)
+    sorted_text = "、".join(_format_number(value) for value in sorted(values))
+    return (
+        "**データの分析結果**\n"
+        f"データ数：{len(values)}\n"
+        f"小さい順：{sorted_text}\n"
+        f"平均値：{_format_number(mean_value)}\n"
+        f"中央値：{_format_number(median_value)}\n"
+        f"最頻値：{mode_text}\n"
+        f"範囲：{_format_number(data_range)}\n"
+        f"分散（母分散）：{_format_number(variance)}\n"
+        f"標準偏差（母標準偏差）：{_format_number(stddev)}\n"
+        "※入力されたデータ全体を母集団として計算しています。"
+    )
+
+
+def solve_geometry(request: str) -> str | None:
+    """Solve elementary circle, rectangle, and triangle measurement problems."""
+    text = (request or "").replace("．", ".").replace("、", " ").replace("，", " ")
+    number = r"(\d+(?:\.\d+)?)"
+    unit = r"\s*(mm|cm|m)?"
+
+    radius_match = re.search(r"半径\s*" + number + unit, text)
+    if radius_match and any(word in text for word in ("円", "円周", "面積")):
+        radius = float(radius_match.group(1))
+        unit_name = radius_match.group(2) or ""
+        if any(word in text for word in ("円周", "周の長さ", "円周の長さ")):
+            result = 2 * math.pi * radius
+            formula = "円周 = 2πr"
+            label = "円周"
+        else:
+            result = math.pi * radius * radius
+            formula = "面積 = πr²"
+            label = "円の面積"
+        if result > 10**15:
+            return "計算結果が大きすぎます。"
+        return (
+            f"**{label}**\n"
+            f"{formula}、r = {_format_number(radius)}{unit_name}\n"
+            f"答え：約{_format_number(result)}{unit_name}²" if label == "円の面積"
+            else f"**{label}**\n{formula}、r = {_format_number(radius)}{unit_name}\n"
+            f"答え：約{_format_number(result)}{unit_name}"
+        )
+
+    if any(word in text for word in ("長方形", "長方形の面積")) and "面積" in text:
+        values = re.findall(number + unit, text)
+        if len(values) >= 2:
+            first, second = values[:2]
+            a, b = float(first[0]), float(second[0])
+            u1, u2 = first[1] or "", second[1] or ""
+            if u1 == u2:
+                if not _bounded_reasoning_values(a, b):
+                    return "入力値が大きすぎます。"
+                result = a * b
+                if not _bounded_reasoning_values(result, limit=10**15):
+                    return "計算結果が大きすぎます。"
+                return (
+                    "**長方形の面積**\n"
+                    f"面積 = たて × よこ = {_format_number(a)} × {_format_number(b)}\n"
+                    f"答え：{_format_number(result)}{u1}²"
+                )
+
+    if "三角形" in text and "面積" in text:
+        base_match = re.search(r"底辺\s*" + number + unit, text)
+        height_match = re.search(r"高さ\s*" + number + unit, text)
+        if base_match and height_match:
+            base = float(base_match.group(1))
+            height = float(height_match.group(1))
+            u1 = base_match.group(2) or ""
+            u2 = height_match.group(2) or ""
+            if u1 == u2:
+                if not _bounded_reasoning_values(base, height):
+                    return "入力値が大きすぎます。"
+                result = base * height / 2
+                if not _bounded_reasoning_values(result, limit=10**15):
+                    return "計算結果が大きすぎます。"
+                return (
+                    "**三角形の面積**\n"
+                    f"面積 = 底辺 × 高さ ÷ 2 = {_format_number(base)} × {_format_number(height)} ÷ 2\n"
+                    f"答え：{_format_number(result)}{u1}²"
+                )
+    return None
+
+
+def solve_speed_distance_time(request: str) -> str | None:
+    """Solve simple speed-distance-time word problems with explicit units."""
+    text = (request or "").replace("／", "/").replace("時速 ", "時速")
+    number = r"(\d+(?:\.\d+)?)"
+
+    speed_first = re.search(r"時速" + number + r"\s*km\s*で\s*" + number + r"\s*時間", text)
+    if speed_first and any(word in text for word in ("距離", "何km", "進む", "走る", "移動")):
+        speed, hours = map(float, speed_first.groups())
+        if not _bounded_reasoning_values(speed, hours):
+            return "入力値が大きすぎます。"
+        distance = speed * hours
+        if not _bounded_reasoning_values(distance, limit=10**15):
+            return "計算結果が大きすぎます。"
+        return (
+            "**速さ・距離・時間の計算**\n"
+            f"距離 = 速さ × 時間 = {speed:g} × {hours:g}\n"
+            f"答え：{_format_number(distance)} km"
+        )
+
+    distance_first = re.search(number + r"\s*km\s*を\s*" + number + r"\s*時間", text)
+    if distance_first and any(word in text for word in ("速さ", "時速", "平均速度")):
+        distance, hours = map(float, distance_first.groups())
+        if hours == 0:
+            return "時間が0なので、速さを計算できません。"
+        speed = distance / hours
+        return (
+            "**速さ・距離・時間の計算**\n"
+            f"速さ = 距離 ÷ 時間 = {distance:g} ÷ {hours:g}\n"
+            f"答え：時速{_format_number(speed)} km"
+        )
+
+    return None
+
+
+
+def solve_ohms_law(request: str) -> str | None:
+    """Solve one missing quantity in V=IR using explicit units."""
+    text = (request or "").replace("Ω", "ohm").replace("オーム", "ohm")
+    resistance = re.search(r"(\d+(?:\.\d+)?)\s*(?:ohm|ohms)", text, re.IGNORECASE)
+    current = re.search(r"(\d+(?:\.\d+)?)\s*A(?:$|[^a-z])", text, re.IGNORECASE)
+    voltage = re.search(r"(\d+(?:\.\d+)?)\s*V(?:$|[^a-z])", text, re.IGNORECASE)
+    if not (resistance and current and voltage):
+        if not (resistance and current or resistance and voltage or current and voltage):
+            return None
+
+    r_value = float(resistance.group(1)) if resistance else None
+    i_value = float(current.group(1)) if current else None
+    v_value = float(voltage.group(1)) if voltage else None
+
+    known_values = [value for value in (r_value, i_value, v_value) if value is not None]
+    if not _bounded_reasoning_values(*known_values):
+        return "入力値が大きすぎます。"
+
+    if r_value is not None and i_value is not None and v_value is None and any(word in text for word in ("電圧", "vを", "求め")):
+        result = r_value * i_value
+        if not _bounded_reasoning_values(result, limit=10**15):
+            return "計算結果が大きすぎます。"
+        return f"**オームの法則**\nV = IR = {r_value:g} × {i_value:g}\n答え：{_format_number(result)} V"
+    if v_value is not None and r_value is not None and i_value is None and any(word in text for word in ("電流", "iを", "求め")):
+        if r_value == 0:
+            return "抵抗が0Ωなので、この条件では電流を計算できません。"
+        result = v_value / r_value
+        return f"**オームの法則**\nI = V ÷ R = {v_value:g} ÷ {r_value:g}\n答え：{_format_number(result)} A"
+    if v_value is not None and i_value is not None and r_value is None and any(word in text for word in ("抵抗", "rを", "求め")):
+        if i_value == 0:
+            return "電流が0Aなので、この条件では抵抗を計算できません。"
+        result = v_value / i_value
+        return f"**オームの法則**\nR = V ÷ I = {v_value:g} ÷ {i_value:g}\n答え：{_format_number(result)} Ω"
+    return None
+
+
+def solve_density(request: str) -> str | None:
+    """Solve mass, volume, or density when units are explicitly supplied."""
+    text = (request or "").replace("³", "3").replace("立方センチ", "cm3").replace("㎤", "cm3")
+    mass = re.search(r"質量\s*(\d+(?:\.\d+)?)\s*g", text)
+    volume = re.search(r"体積\s*(\d+(?:\.\d+)?)\s*cm3", text)
+    density = re.search(r"密度\s*(\d+(?:\.\d+)?)\s*g\s*/\s*cm3", text)
+    if mass and volume and any(word in text for word in ("密度", "求め")):
+        m_value, v_value = float(mass.group(1)), float(volume.group(1))
+        if not _bounded_reasoning_values(m_value, v_value):
+            return "入力値が大きすぎます。"
+        if v_value == 0:
+            return "体積が0なので密度を計算できません。"
+        result = m_value / v_value
+        if not _bounded_reasoning_values(result, limit=10**15):
+            return "計算結果が大きすぎます。"
+        return (
+            "**密度の計算**\n"
+            f"密度 = 質量 ÷ 体積 = {m_value:g} ÷ {v_value:g}\n"
+            f"答え：{_format_number(result)} g/cm³"
+        )
+    if density and volume and any(word in text for word in ("質量", "求め")):
+        d_value, v_value = float(density.group(1)), float(volume.group(1))
+        result = d_value * v_value
+        return (
+            "**質量の計算**\n"
+            f"質量 = 密度 × 体積 = {d_value:g} × {v_value:g}\n"
+            f"答え：{_format_number(result)} g"
+        )
+    if density and mass and any(word in text for word in ("体積", "求め")):
+        d_value, m_value = float(density.group(1)), float(mass.group(1))
+        if d_value == 0:
+            return "密度が0なので体積を計算できません。"
+        result = m_value / d_value
+        return (
+            "**体積の計算**\n"
+            f"体積 = 質量 ÷ 密度 = {m_value:g} ÷ {d_value:g}\n"
+            f"答え：{_format_number(result)} cm³"
+        )
+    return None
 
 
 def _tokens(text: str) -> set[str]:
@@ -973,6 +1578,22 @@ def analyze_question(text: str) -> dict[str, Any]:
 
     if _find_calculation(normalized):
         return {"kind": "calculation", "needs_reference": False, "needs_live_data": False}
+    if re.search(r"\d+\s*[cC]\s*\d+", normalized) or "個から" in normalized and "選ぶ" in normalized:
+        return {"kind": "combinatorics", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("サイコロ", "コイン")) and any(cue in normalized for cue in ("確率", "可能性")):
+        return {"kind": "probability", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("平均", "中央値", "最頻値", "標準偏差", "分散", "統計")):
+        return {"kind": "statistics", "needs_reference": False, "needs_live_data": False}
+    if "%" in normalized or "％" in normalized or "何パーセント" in normalized:
+        return {"kind": "percentage", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("円の面積", "円周", "長方形の面積", "三角形の面積")):
+        return {"kind": "geometry", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("密度", "質量", "体積")) and ("g" in normalized or "cm" in normalized):
+        return {"kind": "density", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("電圧", "電流", "抵抗")) and ("ohm" in normalized or "Ω" in text or "オーム" in normalized):
+        return {"kind": "electric_circuit", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("時速", "速さ", "距離", "何時間")) and any(cue in normalized for cue in ("進む", "移動", "走る", "求め")):
+        return {"kind": "motion_problem", "needs_reference": False, "needs_live_data": False}
 
     if (
         any(cue in normalized for cue in PRIVATE_QUERY_CUES)
@@ -1037,7 +1658,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.8.0"
+    version = "0.9.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -1059,6 +1680,12 @@ class LocalAIEngine:
             "概念グラフを使った用途・理由・具体例の関連推論",
             "計算・方程式の結果を代入して検算する自己確認",
             "一次方程式・二次方程式を安全に解く数式処理",
+            "割合・百分率・割引の文章題",
+            "平均・中央値・最頻値・分散・標準偏差の統計処理",
+            "円・長方形・三角形の面積と円周の計算",
+            "速さ・距離・時間の文章題",
+            "オームの法則と密度の文章題",
+            "組合せ・順列と基本確率の計算",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
 
@@ -1067,6 +1694,14 @@ class LocalAIEngine:
             {"name": "multi_intent_router", "description": "複数の依頼を分割して順番に処理"},
             {"name": "calculator", "description": "四則演算・括弧・剰余・べき乗"},
             {"name": "equation_solver", "description": "一次方程式・二次方程式を安全に解析して解く"},
+            {"name": "percentage_solver", "description": "割合・百分率・割引・増加の文章題"},
+            {"name": "statistics_engine", "description": "平均・中央値・最頻値・分散・標準偏差"},
+            {"name": "geometry_solver", "description": "円・長方形・三角形の面積や円周"},
+            {"name": "motion_solver", "description": "速さ・距離・時間の文章題"},
+            {"name": "ohms_law_solver", "description": "電圧・電流・抵抗から未知量を計算"},
+            {"name": "density_solver", "description": "質量・体積・密度の関係を計算"},
+            {"name": "combinatorics_solver", "description": "組合せ・順列を計算"},
+            {"name": "probability_solver", "description": "公平なサイコロ・コインの基本確率"},
             {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換。計算式にも対応"},
             {"name": "japan_clock", "description": "日本時間の日付と時刻"},
             {"name": "memory_search", "description": "保存済みの記憶をキーワード検索"},
@@ -1095,15 +1730,31 @@ class LocalAIEngine:
             "conversation_context": True,
             "concept_graph": True,
             "self_check": True,
+            "statistics_engine": True,
+            "percentage_solver": True,
+            "geometry_solver": True,
+            "motion_solver": True,
+            "ohms_law_solver": True,
+            "density_solver": True,
+            "combinatorics_solver": True,
+            "probability_solver": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
 
     def _knowledge_answer(self, request: str) -> str | None:
         lowered = request.lower().replace("？", "?")
-        for item in KNOWLEDGE:
-            if any(trigger in lowered for trigger in item["triggers"]):
-                return f"**{item['title']}**\n{item['answer']}"
+        exact_matches = [
+            (len(trigger), item)
+            for item in KNOWLEDGE
+            for trigger in item["triggers"]
+            if trigger.lower() in lowered
+        ]
+        if exact_matches:
+            # Prefer the longest trigger so a specific concept such as
+            # "一次関数" wins over the broader trigger "関数".
+            _, item = max(exact_matches, key=lambda match: match[0])
+            return f"**{item['title']}**\n{item['answer']}"
         query_terms = _tokens(request)
         if not query_terms:
             return None
@@ -1169,6 +1820,78 @@ class LocalAIEngine:
                 "plan": [],
                 "intent": "equation_solving",
                 "tools_used": ["equation_solver"],
+            }
+
+        combinatorics_answer = solve_combinatorics(text)
+        if combinatorics_answer:
+            return {
+                "answer": combinatorics_answer,
+                "plan": [],
+                "intent": "combinatorics",
+                "tools_used": ["combinatorics_solver", "self_check"],
+            }
+
+        probability_answer = solve_simple_probability(text)
+        if probability_answer:
+            return {
+                "answer": probability_answer,
+                "plan": [],
+                "intent": "probability",
+                "tools_used": ["probability_solver", "self_check"],
+            }
+
+        ohms_answer = solve_ohms_law(text)
+        if ohms_answer:
+            return {
+                "answer": ohms_answer,
+                "plan": [],
+                "intent": "electric_circuit_calculation",
+                "tools_used": ["ohms_law_solver", "self_check"],
+            }
+
+        density_answer = solve_density(text)
+        if density_answer:
+            return {
+                "answer": density_answer,
+                "plan": [],
+                "intent": "density_calculation",
+                "tools_used": ["density_solver", "self_check"],
+            }
+
+        percentage_answer = solve_percentage(text)
+        if percentage_answer:
+            return {
+                "answer": percentage_answer,
+                "plan": [],
+                "intent": "percentage_calculation",
+                "tools_used": ["percentage_solver", "self_check"],
+            }
+
+        statistics_answer = solve_statistics(text)
+        if statistics_answer:
+            return {
+                "answer": statistics_answer,
+                "plan": [],
+                "intent": "statistics",
+                "tools_used": ["statistics_engine", "self_check"],
+            }
+
+        geometry_answer = solve_geometry(text)
+        if geometry_answer:
+            return {
+                "answer": geometry_answer,
+                "plan": [],
+                "intent": "geometry",
+                "tools_used": ["geometry_solver", "self_check"],
+            }
+
+        motion_answer = solve_speed_distance_time(text)
+        if motion_answer:
+            return {
+                "answer": motion_answer,
+                "plan": [],
+                "intent": "motion_problem",
+                "tools_used": ["motion_solver", "self_check"],
             }
 
         converted = convert_units(text)
