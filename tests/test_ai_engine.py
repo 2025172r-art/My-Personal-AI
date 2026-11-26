@@ -289,3 +289,39 @@ def test_reference_engine_is_hidden_from_the_app_controls():
     assert "Wikipedia" not in app_source
     assert "online_research" not in app_source
     assert "use_knowledge_search" not in app_source
+
+
+
+def test_irrelevant_reference_results_are_discarded():
+    references = [
+        {
+            "title": "サッカー",
+            "extract": "サッカーは二つのチームが得点を競うスポーツです。",
+            "url": "https://ja.wikipedia.org/?curid=1",
+        },
+        {
+            "title": "量子もつれ",
+            "extract": "量子もつれは量子力学の現象です。",
+            "url": "https://ja.wikipedia.org/?curid=2",
+        },
+    ]
+    selected = ai_engine.select_relevant_references("量子もつれとは？", references)
+    assert len(selected) == 1
+    assert selected[0]["title"] == "量子もつれ"
+    assert selected[0]["relevance_score"] > 0
+
+
+def test_reference_search_does_not_answer_from_unrelated_sources():
+    irrelevant = [{
+        "title": "サッカー",
+        "extract": "球技のルールや歴史についての説明です。",
+        "url": "https://ja.wikipedia.org/?curid=1",
+    }]
+    with patch("ai_engine.search_wikipedia", return_value=irrelevant):
+        result = LocalAIEngine().reply("量子もつれとは何ですか？", sovereign_mode=False)
+    assert result["intent"] == "unknown"
+    assert "信頼できる根拠" in result["answer"]
+
+
+def test_reference_query_strips_personal_prompt_phrasing():
+    assert ai_engine._clean_reference_query("ベルの不等式について教えてください") == "ベルの不等式"
