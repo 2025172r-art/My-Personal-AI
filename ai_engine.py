@@ -451,6 +451,20 @@ _WIKIPEDIA_CACHE: dict[str, tuple[float, list[dict[str, str]]]] = {}
 _WIKIPEDIA_CACHE_TTL = 900
 
 
+def _clean_reference_query(query: str) -> str:
+    """Keep only the factual topic before sending a query to the reference service."""
+    cleaned = re.sub(r"\\s+", " ", (query or "").strip())
+    cleaned = cleaned.strip(" ?？。！!、")
+    cleaned = re.sub(
+        r"(とは何ですか|とは何|とは|って何ですか|って何|について教えてください|について教えて|について調べて|を教えてください|を教えて)$",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"^(what is|who is|explain|definition of)\\s+", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip(" ?？。！!、")[:120]
+
+
 def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
     """Return short, cited extracts from Japanese Wikipedia, then English as fallback.
 
