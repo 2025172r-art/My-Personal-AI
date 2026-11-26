@@ -1579,6 +1579,10 @@ def analyze_question(text: str) -> dict[str, Any]:
 
     if _find_calculation(normalized):
         return {"kind": "calculation", "needs_reference": False, "needs_live_data": False}
+    if re.search(r"\d+\s*[cC]\s*\d+", normalized) or "個から" in normalized and "選ぶ" in normalized:
+        return {"kind": "combinatorics", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("サイコロ", "コイン")) and any(cue in normalized for cue in ("確率", "可能性")):
+        return {"kind": "probability", "needs_reference": False, "needs_live_data": False}
     if any(cue in normalized for cue in ("平均", "中央値", "最頻値", "標準偏差", "分散", "統計")):
         return {"kind": "statistics", "needs_reference": False, "needs_live_data": False}
     if "%" in normalized or "％" in normalized or "何パーセント" in normalized:
