@@ -813,6 +813,10 @@ def calculate(expression: str) -> str:
 
 
 
+def _bounded_reasoning_values(*values: float, limit: float = 10**12) -> bool:
+    return all(math.isfinite(value) and abs(value) <= limit for value in values)
+
+
 def solve_percentage(request: str) -> str | None:
     """Solve common percentage word problems with transparent arithmetic."""
     text = (request or "").replace("，", ",").replace("％", "%").replace(",", "").strip()
