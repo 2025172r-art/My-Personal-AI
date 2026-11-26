@@ -940,7 +940,11 @@ def solve_geometry(request: str) -> str | None:
             a, b = float(first[0]), float(second[0])
             u1, u2 = first[1] or "", second[1] or ""
             if u1 == u2:
+                if not _bounded_reasoning_values(a, b):
+                    return "入力値が大きすぎます。"
                 result = a * b
+                if not _bounded_reasoning_values(result, limit=10**15):
+                    return "計算結果が大きすぎます。"
                 return (
                     "**長方形の面積**\n"
                     f"面積 = たて × よこ = {_format_number(a)} × {_format_number(b)}\n"
@@ -956,7 +960,11 @@ def solve_geometry(request: str) -> str | None:
             u1 = base_match.group(2) or ""
             u2 = height_match.group(2) or ""
             if u1 == u2:
+                if not _bounded_reasoning_values(base, height):
+                    return "入力値が大きすぎます。"
                 result = base * height / 2
+                if not _bounded_reasoning_values(result, limit=10**15):
+                    return "計算結果が大きすぎます。"
                 return (
                     "**三角形の面積**\n"
                     f"面積 = 底辺 × 高さ ÷ 2 = {_format_number(base)} × {_format_number(height)} ÷ 2\n"
@@ -973,7 +981,11 @@ def solve_speed_distance_time(request: str) -> str | None:
     speed_first = re.search(r"時速" + number + r"\s*km\s*で\s*" + number + r"\s*時間", text)
     if speed_first and any(word in text for word in ("距離", "何km", "進む", "走る", "移動")):
         speed, hours = map(float, speed_first.groups())
+        if not _bounded_reasoning_values(speed, hours):
+            return "入力値が大きすぎます。"
         distance = speed * hours
+        if not _bounded_reasoning_values(distance, limit=10**15):
+            return "計算結果が大きすぎます。"
         return (
             "**速さ・距離・時間の計算**\n"
             f"距離 = 速さ × 時間 = {speed:g} × {hours:g}\n"
@@ -1010,8 +1022,14 @@ def solve_ohms_law(request: str) -> str | None:
     i_value = float(current.group(1)) if current else None
     v_value = float(voltage.group(1)) if voltage else None
 
+    known_values = [value for value in (r_value, i_value, v_value) if value is not None]
+    if not _bounded_reasoning_values(*known_values):
+        return "入力値が大きすぎます。"
+
     if r_value is not None and i_value is not None and v_value is None and any(word in text for word in ("電圧", "vを", "求め")):
         result = r_value * i_value
+        if not _bounded_reasoning_values(result, limit=10**15):
+            return "計算結果が大きすぎます。"
         return f"**オームの法則**\nV = IR = {r_value:g} × {i_value:g}\n答え：{_format_number(result)} V"
     if v_value is not None and r_value is not None and i_value is None and any(word in text for word in ("電流", "iを", "求め")):
         if r_value == 0:
@@ -1034,9 +1052,13 @@ def solve_density(request: str) -> str | None:
     density = re.search(r"密度\s*(\d+(?:\.\d+)?)\s*g\s*/\s*cm3", text)
     if mass and volume and any(word in text for word in ("密度", "求め")):
         m_value, v_value = float(mass.group(1)), float(volume.group(1))
+        if not _bounded_reasoning_values(m_value, v_value):
+            return "入力値が大きすぎます。"
         if v_value == 0:
             return "体積が0なので密度を計算できません。"
         result = m_value / v_value
+        if not _bounded_reasoning_values(result, limit=10**15):
+            return "計算結果が大きすぎます。"
         return (
             "**密度の計算**\n"
             f"密度 = 質量 ÷ 体積 = {m_value:g} ÷ {v_value:g}\n"
