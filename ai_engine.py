@@ -569,7 +569,7 @@ def analyze_question(text: str) -> dict[str, Any]:
 
     if (
         any(cue in normalized for cue in PRIVATE_QUERY_CUES)
-        or re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", text, re.IGNORECASE)
+        or re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", text, re.IGNORECASE)
     ):
         return {"kind": "private_or_sensitive", "needs_reference": False, "needs_live_data": False}
 
