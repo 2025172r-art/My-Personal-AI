@@ -599,6 +599,32 @@ def analyze_question(text: str) -> dict[str, Any]:
     return {"kind": "general_request", "needs_reference": False, "needs_live_data": False}
 
 
+
+def select_relevant_references(
+    query: str,
+    references: list[dict[str, str]],
+    threshold: float = 0.10,
+) -> list[dict[str, Any]]:
+    """Score source relevance against the topic; drop weak matches."""
+    query_terms = _tokens(_clean_reference_query(query))
+    if not query_terms:
+        return []
+
+    ranked: list[tuple[float, dict[str, str]]] = []
+    for item in references:
+        title_terms = _tokens(item.get("title", ""))
+        body_terms = _tokens(item.get("extract", ""))
+        title_score = len(query_terms & title_terms) / len(query_terms)
+        body_score = len(query_terms & body_terms) / len(query_terms)
+        score = 0.7 * title_score + 0.3 * body_score
+        if title_score > 0 or score >= threshold:
+            enriched = dict(item)
+            enriched["relevance_score"] = round(score, 3)
+            ranked.append((score, enriched))
+
+    ranked.sort(key=lambda row: (-row[0], row[1].get("title", "")))
+    return [item for _, item in ranked[:2]]
+
 def _format_reference_answer(query: str, references: list[dict[str, str]]) -> str:
     """Turn retrieved encyclopedia extracts into a modest, source-linked answer."""
     lines = [
@@ -817,7 +843,8 @@ class LocalAIEngine:
 
         assessment = analyze_question(text)
         if assessment["needs_reference"]:
-            references = search_wikipedia(text)
+            retrieved = search_wikipedia(text)
+            references = select_relevant_references(text, retrieved)
             if references:
                 return {
                     "answer": _format_reference_answer(text, references),
@@ -825,7 +852,7 @@ class LocalAIEngine:
                     "intent": "reference_research",
                     "tools_used": ["reference_retrieval"],
                     "sources": references,
-                    "reasoning_route": "local_knowledge_miss_then_reference_lookup",
+                    "reasoning_route": "local_knowledge_miss_then_relevant_source_verified",
                 }
 
         if assessment["kind"] == "private_or_sensitive":
