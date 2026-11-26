@@ -794,7 +794,7 @@ def solve_percentage(request: str) -> str | None:
     number = r"(\d+(?:\.\d+)?)"
 
     match = re.search(number + r"\s*(?:円|個|人|kg|g|m|km)?\s*の\s*" + number + r"\s*%", text)
-    if match:
+    if match and not re.match(r"\s*(引き|割引|値下げ)", text[match.end():]):
         base, rate = map(float, match.groups())
         result = base * rate / 100
         if abs(result) <= 10**15:
@@ -815,7 +815,7 @@ def solve_percentage(request: str) -> str | None:
                 f"答え：{_format_number(result)}"
             )
 
-    match = re.search(number + r"\s*(?:円|個|人)?\s*を\s*" + number + r"\s*%\s*(引き|割引|値下げ|増し|増やす|増加|上げる|上昇)", text)
+    match = re.search(number + r"\s*(?:円|個|人)?\s*(?:を|の)\s*" + number + r"\s*%\s*(引き|割引|値下げ|増し|増やす|増加|上げる|上昇)", text)
     if match:
         base, rate = map(float, match.groups()[:2])
         action = match.group(3)
@@ -1313,6 +1313,14 @@ def analyze_question(text: str) -> dict[str, Any]:
 
     if _find_calculation(normalized):
         return {"kind": "calculation", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("平均", "中央値", "最頻値", "標準偏差", "分散", "統計")):
+        return {"kind": "statistics", "needs_reference": False, "needs_live_data": False}
+    if "%" in normalized or "％" in normalized or "何パーセント" in normalized:
+        return {"kind": "percentage", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("円の面積", "円周", "長方形の面積", "三角形の面積")):
+        return {"kind": "geometry", "needs_reference": False, "needs_live_data": False}
+    if any(cue in normalized for cue in ("時速", "速さ", "距離", "何時間")) and any(cue in normalized for cue in ("進む", "移動", "走る", "求め")):
+        return {"kind": "motion_problem", "needs_reference": False, "needs_live_data": False}
 
     if (
         any(cue in normalized for cue in PRIVATE_QUERY_CUES)
@@ -1399,6 +1407,10 @@ class LocalAIEngine:
             "概念グラフを使った用途・理由・具体例の関連推論",
             "計算・方程式の結果を代入して検算する自己確認",
             "一次方程式・二次方程式を安全に解く数式処理",
+            "割合・百分率・割引の文章題",
+            "平均・中央値・最頻値・分散・標準偏差の統計処理",
+            "円・長方形・三角形の面積と円周の計算",
+            "速さ・距離・時間の文章題",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
 
@@ -1407,6 +1419,10 @@ class LocalAIEngine:
             {"name": "multi_intent_router", "description": "複数の依頼を分割して順番に処理"},
             {"name": "calculator", "description": "四則演算・括弧・剰余・べき乗"},
             {"name": "equation_solver", "description": "一次方程式・二次方程式を安全に解析して解く"},
+            {"name": "percentage_solver", "description": "割合・百分率・割引・増加の文章題"},
+            {"name": "statistics_engine", "description": "平均・中央値・最頻値・分散・標準偏差"},
+            {"name": "geometry_solver", "description": "円・長方形・三角形の面積や円周"},
+            {"name": "motion_solver", "description": "速さ・距離・時間の文章題"},
             {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換。計算式にも対応"},
             {"name": "japan_clock", "description": "日本時間の日付と時刻"},
             {"name": "memory_search", "description": "保存済みの記憶をキーワード検索"},
@@ -1435,6 +1451,10 @@ class LocalAIEngine:
             "conversation_context": True,
             "concept_graph": True,
             "self_check": True,
+            "statistics_engine": True,
+            "percentage_solver": True,
+            "geometry_solver": True,
+            "motion_solver": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -1509,6 +1529,42 @@ class LocalAIEngine:
                 "plan": [],
                 "intent": "equation_solving",
                 "tools_used": ["equation_solver"],
+            }
+
+        percentage_answer = solve_percentage(text)
+        if percentage_answer:
+            return {
+                "answer": percentage_answer,
+                "plan": [],
+                "intent": "percentage_calculation",
+                "tools_used": ["percentage_solver", "self_check"],
+            }
+
+        statistics_answer = solve_statistics(text)
+        if statistics_answer:
+            return {
+                "answer": statistics_answer,
+                "plan": [],
+                "intent": "statistics",
+                "tools_used": ["statistics_engine", "self_check"],
+            }
+
+        geometry_answer = solve_geometry(text)
+        if geometry_answer:
+            return {
+                "answer": geometry_answer,
+                "plan": [],
+                "intent": "geometry",
+                "tools_used": ["geometry_solver", "self_check"],
+            }
+
+        motion_answer = solve_speed_distance_time(text)
+        if motion_answer:
+            return {
+                "answer": motion_answer,
+                "plan": [],
+                "intent": "motion_problem",
+                "tools_used": ["motion_solver", "self_check"],
             }
 
         converted = convert_units(text)
