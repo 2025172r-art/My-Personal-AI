@@ -8,7 +8,6 @@ import time
 from collections import Counter
 from datetime import datetime
 from typing import Any
-from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import requests
