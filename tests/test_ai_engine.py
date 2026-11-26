@@ -265,3 +265,18 @@ def test_reference_tool_is_not_listed_as_a_user_facing_capability():
     capabilities = LocalAIEngine().capabilities()
     assert not any("Wikipedia" in item for item in capabilities)
     assert not any("参考資料を内部取得" in item for item in capabilities)
+
+
+
+def test_reference_query_is_reduced_to_the_topic():
+    assert ai_engine._clean_reference_query("量子もつれとは何ですか？") == "量子もつれ"
+    assert ai_engine._clean_reference_query("What is quantum entanglement?") == "quantum entanglement"
+
+
+def test_email_address_is_protected_from_external_lookup():
+    result = LocalAIEngine().reply(
+        "このメール user@example.com は何ですか？",
+        sovereign_mode=False,
+    )
+    assert result["intent"] == "private_or_sensitive"
+    assert "外部" in result["answer"]
