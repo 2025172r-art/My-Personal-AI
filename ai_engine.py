@@ -39,7 +39,78 @@ UNIT_TABLE = {
 }
 
 KNOWLEDGE = [
-
+    {
+        "title": "ピタゴラスの定理",
+        "triggers": ["ピタゴラスの定理", "三平方の定理", "直角三角形の辺"],
+        "answer": (
+            "直角三角形で、直角をはさむ2辺をa,b、斜辺をcとすると、a²+b²=c²が成り立ちます。"
+            "例えば、a=3、b=4なら、c=√(3²+4²)=5です。"
+            "この関係は、直角三角形の辺の長さや距離を求めるときに使います。"
+        ),
+    },
+    {
+        "title": "オームの法則",
+        "triggers": ["オームの法則", "電圧と電流と抵抗", "抵抗の計算"],
+        "answer": (
+            "オームの法則は、抵抗が一定の導体で電圧V、電流I、抵抗Rの間にV=IRが成り立つという関係です。"
+            "電圧はボルト(V)、電流はアンペア(A)、抵抗はオーム(Ω)で表します。"
+            "例えば、抵抗が4Ωで電流が2Aなら、電圧は8Vです。"
+        ),
+    },
+    {
+        "title": "原子とは",
+        "triggers": ["原子とは", "原子って何", "原子の構造"],
+        "answer": (
+            "原子は、物質を構成する基本的な粒子の一つです。"
+            "原子核は陽子と中性子からなり、その周囲に電子が存在します。"
+            "陽子の数が元素の種類を決め、電子の状態が化学的性質に大きく関係します。"
+        ),
+    },
+    {
+        "title": "水の循環",
+        "triggers": ["水の循環", "水循環とは", "雨はどうやって降る"],
+        "answer": (
+            "水の循環は、海や湖などの水が蒸発し、水蒸気が冷えて雲になり、雨や雪として地表に戻る流れです。"
+            "地表に戻った水の一部は川や地下水を通って海へ流れ、再び循環します。"
+            "太陽エネルギーと重力が、この循環を動かす主な要因です。"
+        ),
+    },
+    {
+        "title": "プレートテクトニクス",
+        "triggers": ["プレートテクトニクス", "プレートとは", "大陸移動の仕組み"],
+        "answer": (
+            "プレートテクトニクスは、地球表面の硬い岩板（プレート）が移動するという理論です。"
+            "プレートの境界では、地震・火山活動・山脈の形成などが起こります。"
+            "プレート同士が離れる境界、近づく境界、横にずれ動く境界があります。"
+        ),
+    },
+    {
+        "title": "アルゴリズムとは",
+        "triggers": ["アルゴリズムとは", "アルゴリズムって何", "処理手順とは"],
+        "answer": (
+            "アルゴリズムは、問題を解くための明確な手順や計算方法です。"
+            "入力、処理、出力を整理し、正しさ・速さ・必要なメモリなどを考えて設計します。"
+            "並べ替え、検索、最短経路の計算などが代表例です。"
+        ),
+    },
+    {
+        "title": "データベースとは",
+        "triggers": ["データベースとは", "databaseとは", "dbとは", "データベースって何"],
+        "answer": (
+            "データベースは、情報を整理して保存し、必要なときに検索・更新できる仕組みです。"
+            "リレーショナルデータベースでは、表（テーブル）を使ってデータを管理し、SQLで操作します。"
+            "このプロジェクトではSupabaseのPostgreSQLを長期記憶の保存に使っています。"
+        ),
+    },
+    {
+        "title": "進化とは",
+        "triggers": ["進化とは", "生物の進化", "自然選択とは"],
+        "answer": (
+            "生物学でいう進化は、集団の遺伝的特徴が世代を経て変化することです。"
+            "突然変異や遺伝子の組み換えなどで違いが生じ、自然選択や遺伝的浮動などの作用で集団内の頻度が変わります。"
+            "個体が必要に応じて意図的に変化するという意味ではありません。"
+        ),
+    },
     {
         "title": "電磁誘導とは",
         "triggers": ["電磁誘導とは", "電磁誘導って何", "電磁誘導の仕組み", "ファラデーの電磁誘導"],
@@ -213,6 +284,145 @@ def _safe_math_node(node: ast.AST, depth: int = 0) -> float | int:
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPERATORS:
         return _UNARY_OPERATORS[type(node.op)](_safe_math_node(node.operand, depth + 1))
     raise ValueError("使える演算子は + - * / // % ** と括弧だけです。")
+
+
+
+def _poly_add(
+    left: tuple[float, float, float],
+    right: tuple[float, float, float],
+    sign: float = 1.0,
+) -> tuple[float, float, float]:
+    return tuple(left[i] + sign * right[i] for i in range(3))
+
+
+def _poly_multiply(
+    left: tuple[float, float, float],
+    right: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    result = [0.0, 0.0, 0.0, 0.0, 0.0]
+    for i, a_value in enumerate(left):
+        for j, b_value in enumerate(right):
+            result[i + j] += a_value * b_value
+    if any(abs(value) > 1e-12 for value in result[3:]):
+        raise ValueError("3次以上の方程式には対応していません。")
+    coefficients = tuple(result[:3])
+    if any(not math.isfinite(value) or abs(value) > 10**12 for value in coefficients):
+        raise ValueError("係数が大きすぎます。")
+    return coefficients
+
+
+def _polynomial_node(node: ast.AST, depth: int = 0) -> tuple[float, float, float]:
+    """Parse a polynomial in x with degree <= 2 without executing user code."""
+    if depth > 20:
+        raise ValueError("式が複雑すぎます。")
+    if isinstance(node, ast.Expression):
+        return _polynomial_node(node.body, depth + 1)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+        value = float(node.value)
+        if not math.isfinite(value) or abs(value) > 10**12:
+            raise ValueError("数値が大きすぎます。")
+        return (value, 0.0, 0.0)
+    if isinstance(node, ast.Name) and node.id.lower() == "x":
+        return (0.0, 1.0, 0.0)
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPERATORS:
+        value = _polynomial_node(node.operand, depth + 1)
+        sign = -1.0 if isinstance(node.op, ast.USub) else 1.0
+        return tuple(sign * coefficient for coefficient in value)
+    if isinstance(node, ast.BinOp):
+        left = _polynomial_node(node.left, depth + 1)
+        right = _polynomial_node(node.right, depth + 1)
+        if isinstance(node.op, ast.Add):
+            return _poly_add(left, right)
+        if isinstance(node.op, ast.Sub):
+            return _poly_add(left, right, -1.0)
+        if isinstance(node.op, ast.Mult):
+            return _poly_multiply(left, right)
+        if isinstance(node.op, ast.Div):
+            if abs(right[1]) > 1e-12 or abs(right[2]) > 1e-12 or abs(right[0]) < 1e-12:
+                raise ValueError("割る数は0以外の定数にしてください。")
+            return tuple(value / right[0] for value in left)
+        if isinstance(node.op, ast.Pow):
+            if any(abs(value) > 1e-12 for value in left[1:]):
+                raise ValueError("変数を含む式の指数は0、1、2だけ使えます。")
+            exponent = int(left[0])
+            if left[0] != exponent or exponent not in (0, 1, 2):
+                raise ValueError("指数は0、1、2だけ使えます。")
+            if exponent == 0:
+                return (1.0, 0.0, 0.0)
+            if exponent == 1:
+                return right
+            return _poly_multiply(right, right)
+    raise ValueError("対応していない式です。")
+
+
+def solve_equation(request: str) -> str | None:
+    """Solve linear/quadratic equations in x with a bounded AST parser."""
+    text = (request or "").strip().lower().replace("＝", "=").replace("^", "**")
+    text = re.sub(r"(を解いてください|を解いて|解いてください|解いて)$", "", text).strip()
+    if text.count("=") != 1 or not re.search(r"\\bx\\b", text):
+        return None
+    left_text, right_text = (part.strip() for part in text.split("=", 1))
+    if not left_text or not right_text or len(text) > 180:
+        return None
+
+    # Support ordinary school notation such as 2x and 3(x+1).
+    for name, value in (("left_text", left_text), ("right_text", right_text)):
+        value = re.sub(r"(?<=\\d)\\s*(?=x\\b)", "*", value)
+        value = re.sub(r"(?<=\\))\\s*(?=x\\b|\\()", "*", value)
+        value = re.sub(r"(?<=x)\\s*(?=\\()", "*", value)
+        if name == "left_text":
+            left_text = value
+        else:
+            right_text = value
+
+    try:
+        left_tree = ast.parse(left_text, mode="eval")
+        right_tree = ast.parse(right_text, mode="eval")
+        if sum(1 for _ in ast.walk(left_tree)) + sum(1 for _ in ast.walk(right_tree)) > 60:
+            return None
+        left = _polynomial_node(left_tree)
+        right = _polynomial_node(right_tree)
+        a, b, c = _poly_add(left, right, -1.0)
+    except (SyntaxError, ValueError, TypeError, OverflowError):
+        return None
+
+    epsilon = 1e-10
+    if abs(a) < epsilon and abs(b) < epsilon:
+        if abs(c) < epsilon:
+            return "この方程式は、すべての実数が解になります。"
+        return "この方程式を満たす実数解はありません。"
+
+    if abs(a) < epsilon:
+        answer = -c / b
+        return (
+            "**一次方程式の解**\\n"
+            f"整理すると {b:g}x + ({c:g}) = 0 です。\\n"
+            f"x = -({c:g}) / {b:g} = {_format_number(answer)}"
+        )
+
+    discriminant = b * b - 4 * a * c
+    if discriminant < -epsilon:
+        return (
+            "**二次方程式の解**\\n"
+            f"判別式 D = b² - 4ac = {discriminant:g} です。\\n"
+            "Dが0未満なので、実数の解はありません。"
+        )
+    if abs(discriminant) <= epsilon:
+        root = -b / (2 * a)
+        return (
+            "**二次方程式の解**\\n"
+            "判別式 D = 0 なので重解です。\\n"
+            f"x = {_format_number(root)}"
+        )
+
+    root_d = math.sqrt(discriminant)
+    roots = sorted(((-b - root_d) / (2 * a), (-b + root_d) / (2 * a)))
+    return (
+        "**二次方程式の解**\\n"
+        f"判別式 D = b² - 4ac = {_format_number(discriminant)} です。\\n"
+        "解の公式 x = (-b ± √D) / 2a より、\\n"
+        f"x = {_format_number(roots[0])} または x = {_format_number(roots[1])}"
+    )
 
 
 def calculate(expression: str) -> str:
@@ -644,7 +854,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.6.0"
+    version = "0.7.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -662,12 +872,15 @@ class LocalAIEngine:
             "君主風の簡潔・断定的な報告スタイル（切替可能）",
             "数学・理科などの基礎知識",
             "質問の種類と必要な処理を自動判定する推論ルーター",
+            "一次方程式・二次方程式を安全に解く数式処理",
+            "理科・数学・プログラミングの基礎知識を拡張",
         ]
 
     def tools(self) -> list[dict[str, str]]:
         return [
             {"name": "multi_intent_router", "description": "複数の依頼を分割して順番に処理"},
             {"name": "calculator", "description": "四則演算・括弧・剰余・べき乗"},
+            {"name": "equation_solver", "description": "一次方程式・二次方程式を安全に解析して解く"},
             {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換。計算式にも対応"},
             {"name": "japan_clock", "description": "日本時間の日付と時刻"},
             {"name": "memory_search", "description": "保存済みの記憶をキーワード検索"},
@@ -692,6 +905,7 @@ class LocalAIEngine:
             "reference_search": True,
             "automatic_tool_selection": True,
             "question_analysis": True,
+            "equation_solver": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -757,6 +971,15 @@ class LocalAIEngine:
             return {
                 "answer": f"日本時間は {now:%Y年%m月%d日 %H:%M} です。",
                 "plan": [], "intent": "datetime", "tools_used": ["japan_clock"],
+            }
+
+        equation_answer = solve_equation(text)
+        if equation_answer:
+            return {
+                "answer": equation_answer,
+                "plan": [],
+                "intent": "equation_solving",
+                "tools_used": ["equation_solver"],
             }
 
         converted = convert_units(text)
