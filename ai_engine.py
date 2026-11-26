@@ -466,6 +466,74 @@ KNOWLEDGE = [
             "分解者は遺体や排出物などを分解し、物質を環境へ戻す働きをします。"
         ),
     },
+    {
+        "title": "APIとは",
+        "triggers": ["apiとは", "apiって何", "application programming interface"],
+        "answer": (
+            "APIは、ソフトウェア同士が機能やデータをやり取りするための窓口・取り決めです。"
+            "例えば、アプリが地図サービスのAPIを呼び出して地図情報を取得することがあります。"
+            "APIを使うと、すべての機能を一から作らずに他のソフトウェアの機能を利用できます。"
+        ),
+    },
+    {
+        "title": "HTTPとは",
+        "triggers": ["httpとは", "httpsとは", "httpとhttpsの違い"],
+        "answer": (
+            "HTTPは、Webブラウザーとサーバーなどがリクエストとレスポンスを交換するための通信規約です。"
+            "HTTPSはHTTPの通信をTLSで保護し、通信内容の盗み見や改ざん、接続先の偽装を防ぎやすくします。"
+        ),
+    },
+    {
+        "title": "Gitとは",
+        "triggers": ["gitとは", "gitって何", "バージョン管理とは"],
+        "answer": (
+            "Gitは、ファイルの変更履歴を記録し、過去の状態を確認したり複数人で変更を統合したりできる分散型バージョン管理システムです。"
+            "commitは変更の記録、branchは並行作業のための枝、mergeは変更を統合する操作です。"
+        ),
+    },
+    {
+        "title": "SQLとは",
+        "triggers": ["sqlとは", "sqlって何", "select文とは"],
+        "answer": (
+            "SQLは、リレーショナルデータベースのデータを検索・追加・更新・削除したり、表の構造を管理したりするための言語です。"
+            "SELECTで検索、INSERTで追加、UPDATEで更新、DELETEで削除します。"
+            "実際の操作では、権限とWHERE条件を確認して誤更新を防ぎます。"
+        ),
+    },
+    {
+        "title": "教師あり学習と教師なし学習",
+        "triggers": ["教師あり学習とは", "教師なし学習とは", "教師ありと教師なしの違い"],
+        "answer": (
+            "教師あり学習は、入力と正解ラベルの組を使って予測モデルを学ぶ方法です。分類や数値予測などに使われます。"
+            "教師なし学習は、正解ラベルがないデータから、似たもののまとまりや特徴的な構造を見つけます。"
+            "どちらも学習に使っていないデータで性能を評価することが重要です。"
+        ),
+    },
+    {
+        "title": "過学習とは",
+        "triggers": ["過学習とは", "オーバーフィッティングとは", "overfittingとは"],
+        "answer": (
+            "過学習は、モデルが訓練データに過度に適合し、未知のデータでは予測性能が下がる状態です。"
+            "検証データで性能を確認し、モデルを単純化する、データを増やす、正則化を使うなどで抑えることがあります。"
+        ),
+    },
+    {
+        "title": "深層学習とは",
+        "triggers": ["深層学習とは", "ディープラーニングとは", "deep learningとは"],
+        "answer": (
+            "深層学習（ディープラーニング）は、多数の層を持つニューラルネットワークをデータから学習させる機械学習の方法です。"
+            "画像、音声、文章などの複雑なパターンを扱えますが、多くの場合、大量のデータと計算資源が必要です。"
+        ),
+    },
+    {
+        "title": "CPUとメモリの違い",
+        "triggers": ["cpuとメモリの違い", "cpuとは", "ramとは", "メモリとは"],
+        "answer": (
+            "CPUは命令を実行し、計算や制御を行う装置です。"
+            "メモリ（RAM）は、CPUが処理中に使うデータやプログラムを一時的に置く高速な作業領域です。"
+            "一般にRAMの内容は電源を切ると保持されず、SSDなどのストレージとは役割が異なります。"
+        ),
+    },
 ]
 
 STOP_WORDS = {
@@ -811,6 +879,59 @@ def calculate(expression: str) -> str:
         result = int(result)
     return f"計算結果：{result}"
 
+
+
+
+def solve_combinatorics(request: str) -> str | None:
+    """Compute combinations/permutations for bounded school-level inputs."""
+    text = (request or "").replace("Ｃ", "C").replace("ｃ", "c")
+    match = re.search(r"(\d+)\s*[cC]\s*(\d+)", text)
+    if not match:
+        match = re.search(r"(\d+)\s*個から\s*(\d+)\s*個\s*選ぶ", text)
+    if not match:
+        return None
+    n, r = map(int, match.groups())
+    if n > 1000 or r > n:
+        return "組合せは 0 ≤ r ≤ n ≤ 1000 の範囲で計算できます。"
+    is_permutation = any(word in text for word in ("順列", "並べる", "順番"))
+    result = math.perm(n, r) if is_permutation else math.comb(n, r)
+    label = "順列" if is_permutation else "組合せ"
+    formula = f"{n}P{r}" if is_permutation else f"{n}C{r}"
+    return f"**{label}の計算**\n{formula} = {result}\n答え：{result}"
+
+
+def solve_simple_probability(request: str) -> str | None:
+    """Solve transparent fair-die and fair-coin probability examples."""
+    text = (request or "").replace("１", "1").replace("２", "2").replace("３", "3")
+    if "サイコロ" in text and any(word in text for word in ("確率", "可能性")):
+        favorable = None
+        label = ""
+        if "偶数" in text:
+            favorable, label = 3, "偶数"
+        elif "奇数" in text:
+            favorable, label = 3, "奇数"
+        elif re.search(r"([1-6])\s*が出る", text):
+            face = re.search(r"([1-6])\s*が出る", text).group(1)
+            favorable, label = 1, f"{face}が出る"
+        elif re.search(r"([1-6])\s*以下", text):
+            face = int(re.search(r"([1-6])\s*以下", text).group(1))
+            favorable, label = face, f"{face}以下"
+        elif re.search(r"([1-6])\s*以上", text):
+            face = int(re.search(r"([1-6])\s*以上", text).group(1))
+            favorable, label = 7 - face, f"{face}以上"
+        if favorable is not None:
+            divisor = math.gcd(favorable, 6)
+            numerator, denominator = favorable // divisor, 6 // divisor
+            return (
+                f"**サイコロの確率：{label}**\n"
+                f"確率 = {favorable}/6 = {numerator}/{denominator}\n"
+                f"答え：約{_format_number(favorable / 6 * 100)}%"
+            )
+
+    if "コイン" in text and any(word in text for word in ("確率", "可能性")):
+        if "表" in text or "裏" in text:
+            return "**コインの確率**\n公平なコインでは表・裏は同じ確からしさです。\n確率 = 1/2 = 50%"
+    return None
 
 
 def _bounded_reasoning_values(*values: float, limit: float = 10**12) -> bool:
@@ -1535,6 +1656,7 @@ class LocalAIEngine:
             "円・長方形・三角形の面積と円周の計算",
             "速さ・距離・時間の文章題",
             "オームの法則と密度の文章題",
+            "組合せ・順列と基本確率の計算",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
 
@@ -1549,6 +1671,8 @@ class LocalAIEngine:
             {"name": "motion_solver", "description": "速さ・距離・時間の文章題"},
             {"name": "ohms_law_solver", "description": "電圧・電流・抵抗から未知量を計算"},
             {"name": "density_solver", "description": "質量・体積・密度の関係を計算"},
+            {"name": "combinatorics_solver", "description": "組合せ・順列を計算"},
+            {"name": "probability_solver", "description": "公平なサイコロ・コインの基本確率"},
             {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換。計算式にも対応"},
             {"name": "japan_clock", "description": "日本時間の日付と時刻"},
             {"name": "memory_search", "description": "保存済みの記憶をキーワード検索"},
@@ -1583,6 +1707,8 @@ class LocalAIEngine:
             "motion_solver": True,
             "ohms_law_solver": True,
             "density_solver": True,
+            "combinatorics_solver": True,
+            "probability_solver": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -1657,6 +1783,24 @@ class LocalAIEngine:
                 "plan": [],
                 "intent": "equation_solving",
                 "tools_used": ["equation_solver"],
+            }
+
+        combinatorics_answer = solve_combinatorics(text)
+        if combinatorics_answer:
+            return {
+                "answer": combinatorics_answer,
+                "plan": [],
+                "intent": "combinatorics",
+                "tools_used": ["combinatorics_solver", "self_check"],
+            }
+
+        probability_answer = solve_simple_probability(text)
+        if probability_answer:
+            return {
+                "answer": probability_answer,
+                "plan": [],
+                "intent": "probability",
+                "tools_used": ["probability_solver", "self_check"],
             }
 
         ohms_answer = solve_ohms_law(text)
