@@ -39,6 +39,63 @@ UNIT_TABLE = {
 }
 
 KNOWLEDGE = [
+
+    {
+        "title": "電磁誘導とは",
+        "triggers": ["電磁誘導とは", "電磁誘導って何", "電磁誘導の仕組み", "ファラデーの電磁誘導"],
+        "answer": (
+            "電磁誘導は、コイルを通る磁束が変化すると、コイルに起電力が生じる現象です。"
+            "磁石をコイルに近づけたり遠ざけたりする、またはコイルと磁界を相対的に動かすと起こります。"
+            "誘導電流の向きは、その磁束の変化を妨げる向きになるというレンツの法則に従います。"
+            "発電機や変圧器などに応用されています。"
+        ),
+    },
+    {
+        "title": "重力とは",
+        "triggers": ["重力とは", "重力って何", "万有引力とは"],
+        "answer": (
+            "重力は、地球などの天体が物体を引きつける力として日常的に観測されます。"
+            "ニュートンの万有引力の法則では、質量を持つ物体同士が互いに引き合うと説明します。"
+            "より精密には、アインシュタインの一般相対性理論で重力を時空の曲がりとして記述します。"
+        ),
+    },
+    {
+        "title": "DNAとは",
+        "triggers": ["dnaとは", "dnaって何", "デオキシリボ核酸とは"],
+        "answer": (
+            "DNA（デオキシリボ核酸）は、多くの生物で遺伝情報を保存する分子です。"
+            "二本の鎖が二重らせん構造を作り、塩基AとT、GとCが対になります。"
+            "細胞はDNAの情報を読み取り、RNAやタンパク質の合成などに利用します。"
+        ),
+    },
+    {
+        "title": "光合成とは",
+        "triggers": ["光合成とは", "光合成って何", "植物はどうやって栄養を作る"],
+        "answer": (
+            "光合成は、植物や藻類などが光エネルギーを使い、水と二酸化炭素から有機物を作る過程です。"
+            "酸素を放出するタイプの光合成では、光のエネルギーを利用して水が分解され、酸素が生じます。"
+            "簡略化した全体式は 6CO2 + 6H2O + 光エネルギー → C6H12O6 + 6O2 です。"
+        ),
+    },
+    {
+        "title": "空が青く見える理由",
+        "triggers": ["空はなぜ青い", "空が青い理由", "なぜ空は青い"],
+        "answer": (
+            "晴れた昼の空が青く見える主な理由は、太陽光が大気中の分子で散乱されるためです。"
+            "レイリー散乱では、波長の短い光ほど強く散乱されるので、青い光が空の広い範囲から届きます。"
+            "夕方は太陽光が大気中を長く通るため、青い光が散乱され、赤や橙の光が目立ちやすくなります。"
+        ),
+    },
+    {
+        "title": "ニュートンの運動の法則",
+        "triggers": ["ニュートンの運動法則", "運動の三法則", "慣性の法則とは"],
+        "answer": (
+            "ニュートンの運動の三法則は、慣性の法則、運動方程式、作用・反作用の法則です。"
+            "慣性の法則は、合力がゼロなら静止または等速直線運動を続けるというものです。"
+            "運動方程式は、一定質量の場合に合力 F = ma と表されます。"
+            "作用・反作用の法則では、二物体が及ぼし合う力は大きさが等しく向きが反対です。"
+        ),
+    },
     {
         "title": "フェルマーの最終定理",
         "triggers": [
@@ -387,10 +444,25 @@ def _plan_for(request: str) -> list[str]:
     ]
 
 
-# Short-lived in-memory cache: online research is opt-in and only sends the
-# user's query to Wikimedia when the user enables the research toggle.
+# Short-lived in-memory cache for automatic reference retrieval.
+# The query is sent to Wikimedia only when the question router determines
+# that local knowledge and saved memories are insufficient for a factual answer.
 _WIKIPEDIA_CACHE: dict[str, tuple[float, list[dict[str, str]]]] = {}
 _WIKIPEDIA_CACHE_TTL = 900
+
+
+def _clean_reference_query(query: str) -> str:
+    """Keep only the factual topic before sending a query to the reference service."""
+    cleaned = re.sub(r"\s+", " ", (query or "").strip())
+    cleaned = cleaned.strip(" ?？。！!、")
+    cleaned = re.sub(
+        r"(とは何ですか|とは何|とは|って何ですか|って何|について教えてください|について教えて|について調べて|を教えてください|を教えて)$",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"^(what is|who is|explain|definition of)\s+", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip(" ?？。！!、")[:120]
 
 
 def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
@@ -399,7 +471,7 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
     This is reference retrieval, not a generative AI model. Retrieved text is
     treated as untrusted reference material and is never executed as instructions.
     """
-    query = re.sub(r"\s+", " ", (query or "").strip())[:120]
+    query = _clean_reference_query(query)
     if not query:
         return []
 
@@ -409,7 +481,7 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
     if cached and now - cached[0] < _WIKIPEDIA_CACHE_TTL:
         return [dict(item) for item in cached[1]]
 
-    headers = {"User-Agent": "MyPersonalAI/0.5 (educational reference lookup)"}
+    headers = {"User-Agent": "MyPersonalAI/0.6 (educational reference lookup)"}
     for language in ("ja", "en"):
         endpoint = f"https://{language}.wikipedia.org/w/api.php"
         try:
@@ -471,11 +543,108 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
     return []
 
 
+CURRENT_INFO_CUES = (
+    "最新", "今日", "今の", "本日の", "株価", "為替", "天気",
+    "速報", "今週", "昨日", "今日のニュース", "今のニュース",
+    "latest", "today", "current price", "current weather", "stock price",
+    "exchange rate", "weather", "breaking news",
+)
+PRIVATE_QUERY_CUES = (
+    "私の住所", "自分の住所", "私の電話", "電話番号", "メールアドレス",
+    "パスワード", "秘密鍵", "apiキー", "api key", "アクセストークン",
+    "access token", "口座番号", "クレジットカード", "生年月日",
+    "私の氏名", "私の名前", "私の", "自分の", "私について", "ログイン情報",
+    "my address", "my phone", "my email", "my password", "my account",
+    "secret key", "credit card", "account number", "date of birth",
+)
+FACTUAL_QUESTION_CUES = (
+    "とは", "って何", "何ですか", "何とは", "なぜ", "どうして", "理由",
+    "誰", "いつ", "どこ", "どのように", "どういう", "仕組み", "原理",
+    "原因", "歴史", "意味", "定義", "法則", "定理", "公式", "解説",
+    "説明して", "教えて", "答え", "について", "調べて", "比較して",
+    "what is", "who is", "why ", "when ", "where ", "how does", "explain ",
+    "definition", "history of", "meaning of",
+)
+NON_FACTUAL_CUES = (
+    "詩を書", "物語を書", "小説を書", "歌詞を書", "アイデアを出",
+    "ブレインストーミング", "ロールプレイ", "雑談", "感想を聞かせ",
+    "write a poem", "write a story", "brainstorm", "roleplay",
+)
+
+
+def analyze_question(text: str) -> dict[str, Any]:
+    """Deterministic question router for tool selection and confidence handling."""
+    normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+    if not normalized:
+        return {"kind": "empty", "needs_reference": False, "needs_live_data": False}
+
+    if _find_calculation(normalized):
+        return {"kind": "calculation", "needs_reference": False, "needs_live_data": False}
+
+    if (
+        any(cue in normalized for cue in PRIVATE_QUERY_CUES)
+        or re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", text, re.IGNORECASE)
+    ):
+        return {"kind": "private_or_sensitive", "needs_reference": False, "needs_live_data": False}
+
+    if any(cue in normalized for cue in CURRENT_INFO_CUES):
+        return {"kind": "current_information", "needs_reference": False, "needs_live_data": True}
+
+    if any(cue in normalized for cue in NON_FACTUAL_CUES):
+        return {"kind": "creative_or_subjective", "needs_reference": False, "needs_live_data": False}
+
+    if any(cue in normalized for cue in FACTUAL_QUESTION_CUES) or normalized.endswith(("?", "？")):
+        return {"kind": "factual_question", "needs_reference": True, "needs_live_data": False}
+
+    return {"kind": "general_request", "needs_reference": False, "needs_live_data": False}
+
+
+
+def select_relevant_references(
+    query: str,
+    references: list[dict[str, str]],
+    threshold: float = 0.10,
+) -> list[dict[str, Any]]:
+    """Score source relevance against the topic; drop weak matches."""
+    query_terms = _tokens(_clean_reference_query(query))
+    if not query_terms:
+        return []
+
+    ranked: list[tuple[float, dict[str, str]]] = []
+    for item in references:
+        title_terms = _tokens(item.get("title", ""))
+        body_terms = _tokens(item.get("extract", ""))
+        title_score = len(query_terms & title_terms) / len(query_terms)
+        body_score = len(query_terms & body_terms) / len(query_terms)
+        score = 0.7 * title_score + 0.3 * body_score
+        if title_score > 0 or score >= threshold:
+            enriched = dict(item)
+            enriched["relevance_score"] = round(score, 3)
+            ranked.append((score, enriched))
+
+    ranked.sort(key=lambda row: (-row[0], row[1].get("title", "")))
+    return [item for _, item in ranked[:2]]
+
+def _format_reference_answer(query: str, references: list[dict[str, str]]) -> str:
+    """Turn retrieved encyclopedia extracts into a modest, source-linked answer."""
+    lines = [
+        "参考資料を確認しました。以下は取得した記事の要点です。",
+        "資料の記述を短く整理しています。出典リンクから原文も確認できます。",
+    ]
+    for item in references[:2]:
+        summary = _sentence_summary(item.get("extract", ""), max_sentences=3)
+        lines.append(
+            f"**{item.get('title', '参考資料')}**\n{summary}\n"
+            f"出典: [{item.get('title', '記事を開く')}]({item.get('url', '')})"
+        )
+    return "\n\n".join(lines)
+
+
 class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.5.0"
+    version = "0.6.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -491,8 +660,8 @@ class LocalAIEngine:
             "拡充した内蔵知識ベース",
             "不要な拒否を抑え、利用者の口調・形式・目的を優先（安全境界あり）",
             "君主風の簡潔・断定的な報告スタイル（切替可能）",
-            "フェルマーの最終定理などの数学知識",
-            "利用者が許可した場合のWikipedia参考資料検索と出典表示",
+            "数学・理科などの基礎知識",
+            "質問の種類と必要な処理を自動判定する推論ルーター",
         ]
 
     def tools(self) -> list[dict[str, str]]:
@@ -508,7 +677,8 @@ class LocalAIEngine:
             {"name": "text_analyzer", "description": "文字数・英単語数を数える"},
             {"name": "local_knowledge", "description": "内蔵知識ベースを検索"},
             {"name": "command_policy", "description": "利用者優先の指揮系統と安全境界"},
-            {"name": "wikipedia_research", "description": "許可された場合にWikipediaの概要を検索し出典リンクを表示"},
+            {"name": "question_analyzer", "description": "質問を分類し、必要な処理を自動判定"},
+            {"name": "evidence_retrieval", "description": "ローカル知識で不足するときだけ参考資料を取得"},
         ]
 
     def health(self) -> dict[str, Any]:
@@ -520,6 +690,8 @@ class LocalAIEngine:
             "user_priority": True,
             "sovereign_style": True,
             "reference_search": True,
+            "automatic_tool_selection": True,
+            "question_analysis": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -549,7 +721,6 @@ class LocalAIEngine:
         text: str,
         memories: list[dict[str, Any]],
         document_context: str,
-        use_knowledge_search: bool = False,
     ) -> dict[str, Any]:
         lowered = text.lower()
 
@@ -670,32 +841,55 @@ class LocalAIEngine:
                 "plan": [], "intent": "memory_context", "tools_used": ["memory_search"],
             }
 
-        if use_knowledge_search:
-            references = search_wikipedia(text)
+        assessment = analyze_question(text)
+        if assessment["needs_reference"]:
+            retrieved = search_wikipedia(text)
+            references = select_relevant_references(text, retrieved)
             if references:
-                answer_lines = [
-                    "**参考資料から確認した内容です（Wikipediaの概要）。**",
-                    "以下は取得した資料の抜粋です。複雑な問題の完全な解答や証明とは限りません。",
-                ]
-                for item in references:
-                    answer_lines.append(
-                        f"**{item['title']}**\n{item['extract']}\n出典: [{item['title']}]({item['url']})"
-                    )
                 return {
-                    "answer": "\n\n".join(answer_lines),
+                    "answer": _format_reference_answer(text, references),
                     "plan": [],
                     "intent": "reference_research",
-                    "tools_used": ["wikipedia_reference_search"],
+                    "tools_used": ["reference_retrieval"],
                     "sources": references,
+                    "reasoning_route": "local_knowledge_miss_then_relevant_source_verified",
                 }
+
+        if assessment["kind"] == "private_or_sensitive":
+            return {
+                "answer": (
+                    "個人情報や認証情報に関する内容は、外部の参考資料検索へ送りません。"
+                    "この会話で提供された情報や、アプリ内に保存した情報の範囲で確認してください。"
+                ),
+                "plan": [],
+                "intent": "private_or_sensitive",
+                "tools_used": [],
+                "reasoning_route": "privacy_protected_no_external_lookup",
+            }
+
+        if assessment["needs_live_data"]:
+            answer = (
+                "この質問は最新情報が必要ですが、現在の私の参照資料は百科事典中心で、"
+                "リアルタイム情報を確認できません。"
+                "更新日時が確認できる公式サイトや最新資料を使って再確認してください。"
+            )
+            return {
+                "answer": answer,
+                "plan": [],
+                "intent": "current_information_unavailable",
+                "tools_used": [],
+                "reasoning_route": "live_information_required",
+            }
 
         return {
             "answer": (
-                "このエンジンの内蔵知識だけでは、まだ根拠を確認できません。"
-                "作り話で埋めずに、分かる範囲を正確に答えます。"
-                "Wikipediaでの参考資料検索を使うか、関連資料を読み込ませてください。"
+                "内蔵知識、保存済み記憶、利用可能な参考資料を確認しましたが、"
+                "信頼できる根拠を十分に見つけられませんでした。"
+                "不確かな内容を事実のように答えることは避けます。"
+                "質問を具体化するか、関連する資料を添付してください。"
             ),
             "plan": [], "intent": "unknown", "tools_used": [],
+            "reasoning_route": "no_sufficient_evidence",
         }
 
     def reply(
@@ -705,7 +899,6 @@ class LocalAIEngine:
         memories: list[dict[str, Any]] | None = None,
         document_context: str = "",
         sovereign_mode: bool = True,
-        use_knowledge_search: bool = False,
     ) -> dict[str, Any]:
         text = request.strip()
         history = history or []
@@ -717,12 +910,12 @@ class LocalAIEngine:
         parts = split_requests(text)
         if len(parts) == 1:
             result = self._reply_single(
-                parts[0], memories, document_context, use_knowledge_search
+                parts[0], memories, document_context
             )
             return self._apply_persona(result, sovereign_mode)
 
         results = [
-            self._reply_single(part, memories, document_context, use_knowledge_search)
+            self._reply_single(part, memories, document_context)
             for part in parts
         ]
         sections = []
@@ -769,7 +962,6 @@ def run_agent_task(
     use_web_search: bool = False,
     use_multi_agent: bool = False,
     sovereign_mode: bool = True,
-    use_knowledge_search: bool = False,
 ) -> dict[str, Any]:
     """Backward-compatible entry point; intentionally does not call any model API."""
     del client, use_web_search, use_multi_agent
@@ -779,5 +971,4 @@ def run_agent_task(
         memories=memories,
         document_context=document_context,
         sovereign_mode=sovereign_mode,
-        use_knowledge_search=use_knowledge_search,
     )

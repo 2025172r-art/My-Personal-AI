@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import ai_engine
@@ -49,8 +50,10 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.5.0"
+    assert engine.health()["version"] == "0.6.0"
     assert engine.health()["reference_search"] is True
+    assert engine.health()["automatic_tool_selection"] is True
+    assert engine.health()["question_analysis"] is True
     assert engine.health()["multi_intent"] is True
     assert len(engine.tools()) >= 10
 
@@ -91,9 +94,10 @@ def test_knowledge_and_unknown():
     answer = engine.reply("Pythonとは？")
     assert answer["intent"] == "local_knowledge"
     assert "プログラミング言語" in answer["answer"]
-    unknown = engine.reply("火星の地下に何がありますか？")
+    with patch("ai_engine.search_wikipedia", return_value=[]):
+        unknown = engine.reply("火星の地下に何がありますか？", sovereign_mode=False)
     assert unknown["intent"] == "unknown"
-    assert "根拠を確認できません" in unknown["answer"]
+    assert "信頼できる根拠" in unknown["answer"]
 
 
 def test_command_policy_is_bounded():
@@ -123,8 +127,11 @@ def test_sovereign_style_can_be_toggled():
 
 
 def test_unknown_answer_is_concise_and_honest():
-    answer = LocalAIEngine().reply("火星の地下に何がありますか？")["answer"]
-    assert "根拠を確認できません" in answer
+    with patch("ai_engine.search_wikipedia", return_value=[]):
+        answer = LocalAIEngine().reply(
+            "火星の地下に何がありますか？", sovereign_mode=False
+        )["answer"]
+    assert "信頼できる根拠" in answer
     assert "試せること：" not in answer
 
 
@@ -175,30 +182,52 @@ def test_wikipedia_reference_search_extracts_and_cites():
     assert get.call_count == 2
 
 
-def test_wikipedia_research_is_used_only_when_enabled():
+def test_reference_search_is_automatic_when_local_knowledge_is_missing():
     engine = LocalAIEngine()
     references = [{
-        "title": "研究テーマ",
-        "extract": "検証可能な参考情報です。",
+        "title": "量子もつれ",
+        "extract": "量子もつれは量子力学における物理現象です。複数の粒子の状態に相関が現れます。",
         "url": "https://ja.wikipedia.org/?curid=321",
         "language": "ja",
     }]
     with patch("ai_engine.search_wikipedia", return_value=references) as search:
-        disabled = engine.reply("内蔵知識にない研究テーマは何ですか？", sovereign_mode=False)
-        search.assert_not_called()
+        result = engine.reply("量子もつれとは何ですか？", sovereign_mode=False)
 
-        enabled = engine.reply(
-            "内蔵知識にない研究テーマは何ですか？",
-            sovereign_mode=False,
-            use_knowledge_search=True,
-        )
-
-    assert disabled["intent"] == "unknown"
-    assert enabled["intent"] == "reference_research"
-    assert "検証可能な参考情報" in enabled["answer"]
-    assert "https://ja.wikipedia.org/?curid=321" in enabled["answer"]
-    assert enabled["sources"][0]["title"] == "研究テーマ"
+    assert result["intent"] == "reference_research"
+    assert "複数の粒子" in result["answer"]
+    assert "https://ja.wikipedia.org/?curid=321" in result["answer"]
+    assert result["sources"][0]["title"] == "量子もつれ"
     search.assert_called_once()
+
+
+def test_reference_search_is_not_used_when_local_knowledge_is_enough():
+    with patch("ai_engine.search_wikipedia") as search:
+        result = LocalAIEngine().reply("電磁誘導とは？", sovereign_mode=False)
+    assert result["intent"] == "local_knowledge"
+    assert "磁束" in result["answer"]
+    search.assert_not_called()
+
+
+def test_reference_search_is_not_used_for_creative_requests():
+    with patch("ai_engine.search_wikipedia") as search:
+        result = LocalAIEngine().reply("短い冒険物語を書いて", sovereign_mode=False)
+    assert result["intent"] == "unknown"
+    search.assert_not_called()
+
+
+def test_reference_search_is_not_used_for_realtime_data():
+    with patch("ai_engine.search_wikipedia") as search:
+        result = LocalAIEngine().reply("今日の株価を教えて", sovereign_mode=False)
+    assert result["intent"] == "current_information_unavailable"
+    assert "最新情報" in result["answer"]
+    search.assert_not_called()
+
+
+def test_question_router_classifies_reasoning_routes():
+    assert ai_engine.analyze_question("2 + 3 を計算して")["kind"] == "calculation"
+    assert ai_engine.analyze_question("量子もつれとは？")["needs_reference"] is True
+    assert ai_engine.analyze_question("今日の天気は？")["needs_live_data"] is True
+    assert ai_engine.analyze_question("詩を書いて")["kind"] == "creative_or_subjective"
 
 
 def test_wikipedia_timeout_or_network_failure_is_graceful():
@@ -207,3 +236,92 @@ def test_wikipedia_timeout_or_network_failure_is_graceful():
 
     with patch("ai_engine.requests.get", side_effect=requests.Timeout("timeout")):
         assert ai_engine.search_wikipedia("接続エラー確認") == []
+
+
+
+def test_fermat_knowledge_has_priority_over_reference_retrieval():
+    with patch("ai_engine.search_wikipedia") as search:
+        result = LocalAIEngine().reply(
+            "フェルマーの最終決定の答えを教えてください",
+            sovereign_mode=False,
+        )
+    assert result["intent"] == "local_knowledge"
+    assert "正の整数 x, y, z は存在しない" in result["answer"]
+    search.assert_not_called()
+
+
+
+def test_private_queries_are_never_sent_to_reference_search():
+    with patch("ai_engine.search_wikipedia") as search:
+        result = LocalAIEngine().reply(
+            "私の住所と電話番号を調べて",
+            sovereign_mode=False,
+        )
+    assert result["intent"] == "private_or_sensitive"
+    assert "外部" in result["answer"]
+    search.assert_not_called()
+
+
+def test_reference_tool_is_not_listed_as_a_user_facing_capability():
+    capabilities = LocalAIEngine().capabilities()
+    assert not any("Wikipedia" in item for item in capabilities)
+    assert not any("参考資料を内部取得" in item for item in capabilities)
+
+
+
+def test_reference_query_is_reduced_to_the_topic():
+    assert ai_engine._clean_reference_query("量子もつれとは何ですか？") == "量子もつれ"
+    assert ai_engine._clean_reference_query("What is quantum entanglement?") == "quantum entanglement"
+
+
+def test_email_address_is_protected_from_external_lookup():
+    result = LocalAIEngine().reply(
+        "このメール user@example.com は何ですか？",
+        sovereign_mode=False,
+    )
+    assert result["intent"] == "private_or_sensitive"
+    assert "外部" in result["answer"]
+
+
+
+def test_reference_engine_is_hidden_from_the_app_controls():
+    app_source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(encoding="utf-8")
+    assert "Wikipedia" not in app_source
+    assert "online_research" not in app_source
+    assert "use_knowledge_search" not in app_source
+
+
+
+def test_irrelevant_reference_results_are_discarded():
+    references = [
+        {
+            "title": "サッカー",
+            "extract": "サッカーは二つのチームが得点を競うスポーツです。",
+            "url": "https://ja.wikipedia.org/?curid=1",
+        },
+        {
+            "title": "量子もつれ",
+            "extract": "量子もつれは量子力学の現象です。",
+            "url": "https://ja.wikipedia.org/?curid=2",
+        },
+    ]
+    selected = ai_engine.select_relevant_references("量子もつれとは？", references)
+    assert len(selected) == 1
+    assert selected[0]["title"] == "量子もつれ"
+    assert selected[0]["relevance_score"] > 0
+
+
+def test_reference_search_does_not_answer_from_unrelated_sources():
+    irrelevant = [{
+        "title": "サッカー",
+        "extract": "球技のルールや歴史についての説明です。",
+        "url": "https://ja.wikipedia.org/?curid=1",
+    }]
+    with patch("ai_engine.search_wikipedia", return_value=irrelevant):
+        result = LocalAIEngine().reply("量子もつれとは何ですか？", sovereign_mode=False)
+    assert result["intent"] == "unknown"
+    assert "信頼できる根拠" in result["answer"]
+
+
+def test_reference_query_strips_personal_prompt_phrasing():
+    assert ai_engine._clean_reference_query("ベルの不等式について教えてください") == "ベルの不等式"
