@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import ai_engine
@@ -280,3 +281,11 @@ def test_email_address_is_protected_from_external_lookup():
     )
     assert result["intent"] == "private_or_sensitive"
     assert "外部" in result["answer"]
+
+
+
+def test_reference_engine_is_hidden_from_the_app_controls():
+    app_source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(encoding="utf-8")
+    assert "Wikipedia" not in app_source
+    assert "online_research" not in app_source
+    assert "use_knowledge_search" not in app_source
