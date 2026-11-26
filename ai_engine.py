@@ -627,7 +627,7 @@ CONCEPT_GRAPH: dict[str, dict[str, str]] = {
 FOLLOWUP_CUES = (
     "それは", "それが", "それを", "それの", "それって", "これは", "これが",
     "この仕組み", "その理由", "なぜ", "どうして", "何に使", "用途",
-    "例を", "例えば", "もっと詳しく", "もう少し詳しく", "続き",
+    "例を", "例えば", "それぞれ", "違いは", "どう違う", "もっと詳しく", "もう少し詳しく", "続き",
 )
 
 
@@ -912,7 +912,7 @@ def solve_combinatorics(request: str) -> str | None:
     text = (request or "").replace("Ｃ", "C").replace("ｃ", "c")
     match = re.search(r"(\d+)\s*[cC]\s*(\d+)", text)
     if not match:
-        match = re.search(r"(\d+)\s*個から\s*(\d+)\s*個\s*選ぶ", text)
+        match = re.search(r"(\d+)\s*個から\s*(\d+)\s*個(?:を)?\s*選(?:ぶ|んで)", text)
     if not match:
         return None
     n, r = map(int, match.groups())
@@ -1744,9 +1744,17 @@ class LocalAIEngine:
 
     def _knowledge_answer(self, request: str) -> str | None:
         lowered = request.lower().replace("？", "?")
-        for item in KNOWLEDGE:
-            if any(trigger in lowered for trigger in item["triggers"]):
-                return f"**{item['title']}**\n{item['answer']}"
+        exact_matches = [
+            (len(trigger), item)
+            for item in KNOWLEDGE
+            for trigger in item["triggers"]
+            if trigger.lower() in lowered
+        ]
+        if exact_matches:
+            # Prefer the longest trigger so a specific concept such as
+            # "一次関数" wins over the broader trigger "関数".
+            _, item = max(exact_matches, key=lambda match: match[0])
+            return f"**{item['title']}**\n{item['answer']}"
         query_terms = _tokens(request)
         if not query_terms:
             return None
