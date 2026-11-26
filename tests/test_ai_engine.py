@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import ai_engine
-from ai_engine import LocalAIEngine, calculate, convert_units, split_requests
+from ai_engine import LocalAIEngine, calculate, convert_units, solve_equation, split_requests
 
 
 def test_safe_calculator():
@@ -50,7 +50,8 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.6.0"
+    assert engine.health()["version"] == "0.7.0"
+    assert engine.health()["equation_solver"] is True
     assert engine.health()["reference_search"] is True
     assert engine.health()["automatic_tool_selection"] is True
     assert engine.health()["question_analysis"] is True
@@ -325,3 +326,53 @@ def test_reference_search_does_not_answer_from_unrelated_sources():
 
 def test_reference_query_strips_personal_prompt_phrasing():
     assert ai_engine._clean_reference_query("ベルの不等式について教えてください") == "ベルの不等式"
+
+
+
+def test_linear_equation_solver():
+    result = solve_equation("2x + 3 = 7 を解いて")
+    assert result is not None
+    assert "一次方程式の解" in result
+    assert "x = 2" in result
+
+
+def test_quadratic_equation_solver():
+    result = solve_equation("x^2 - 5x + 6 = 0")
+    assert result is not None
+    assert "二次方程式の解" in result
+    assert "x = 2 または x = 3" in result
+
+
+def test_quadratic_equation_with_repeated_root():
+    result = solve_equation("x^2 - 4x + 4 = 0")
+    assert result is not None
+    assert "重解" in result
+    assert "x = 2" in result
+
+
+def test_equation_solver_handles_parentheses():
+    result = solve_equation("2(x + 1) = 6")
+    assert result is not None
+    assert "x = 2" in result
+
+
+def test_equation_solver_rejects_unsupported_or_unsafe_expressions():
+    assert solve_equation("x^3 = 8") is None
+    assert solve_equation("__import__('os').system('echo bad') = x") is None
+    assert solve_equation("x / x = 1") is None
+
+
+def test_equation_solver_is_selected_automatically():
+    result = LocalAIEngine().reply("2x + 3 = 7 を解いて", sovereign_mode=False)
+    assert result["intent"] == "equation_solving"
+    assert "x = 2" in result["answer"]
+    assert "equation_solver" in result["tools_used"]
+
+
+def test_expanded_science_and_programming_knowledge():
+    engine = LocalAIEngine()
+    assert "a²+b²=c²" in engine.reply("三平方の定理とは？")["answer"]
+    assert "V=IR" in engine.reply("オームの法則とは？")["answer"]
+    assert "陽子と中性子" in engine.reply("原子の構造を説明して")["answer"]
+    assert "アルゴリズム" in engine.reply("アルゴリズムとは？")["answer"]
+    assert "世代を経て変化" in engine.reply("生物の進化とは？")["answer"]
