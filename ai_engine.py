@@ -530,15 +530,18 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
 
 
 CURRENT_INFO_CUES = (
-    "最新", "今日", "現在", "今の", "本日の", "株価", "為替", "天気",
+    "最新", "今日", "今の", "本日の", "株価", "為替", "天気",
     "速報", "今週", "昨日", "今日のニュース", "今のニュース",
-    "latest", "current", "today", "stock price", "exchange rate", "weather", "breaking news",
+    "latest", "today", "current price", "current weather", "stock price",
+    "exchange rate", "weather", "breaking news",
 )
 PRIVATE_QUERY_CUES = (
     "私の住所", "自分の住所", "私の電話", "電話番号", "メールアドレス",
     "パスワード", "秘密鍵", "apiキー", "api key", "アクセストークン",
     "access token", "口座番号", "クレジットカード", "生年月日",
-    "私の氏名", "私の名前", "ログイン情報",
+    "私の氏名", "私の名前", "私の", "自分の", "私について", "ログイン情報",
+    "my address", "my phone", "my email", "my password", "my account",
+    "secret key", "credit card", "account number", "date of birth",
 )
 FACTUAL_QUESTION_CUES = (
     "とは", "って何", "何ですか", "何とは", "なぜ", "どうして", "理由",
@@ -564,7 +567,10 @@ def analyze_question(text: str) -> dict[str, Any]:
     if _find_calculation(normalized):
         return {"kind": "calculation", "needs_reference": False, "needs_live_data": False}
 
-    if any(cue in normalized for cue in PRIVATE_QUERY_CUES):
+    if (
+        any(cue in normalized for cue in PRIVATE_QUERY_CUES)
+        or re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", text, re.IGNORECASE)
+    ):
         return {"kind": "private_or_sensitive", "needs_reference": False, "needs_live_data": False}
 
     if any(cue in normalized for cue in CURRENT_INFO_CUES):
