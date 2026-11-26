@@ -352,6 +352,64 @@ FOLLOWUP_CUES = (
 )
 
 
+def _recent_concept(history: list[dict[str, Any]]) -> str | None:
+    """Resolve a follow-up only to a known concept named in recent chat turns."""
+    recent_text = " ".join(
+        str(item.get("content", ""))[:2000]
+        for item in history[-6:]
+        if item.get("role") in {"user", "assistant"}
+    )
+    matches = [concept for concept in CONCEPT_GRAPH if concept in recent_text]
+    return max(matches, key=len) if matches else None
+
+
+def _answer_contextual_followup(
+    request: str,
+    history: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Answer common follow-ups using a whitelisted concept graph."""
+    normalized = re.sub(r"\s+", "", request.lower())
+    if not any(cue in normalized for cue in FOLLOWUP_CUES):
+        return None
+
+    concept = _recent_concept(history)
+    if not concept:
+        return None
+    facts = CONCEPT_GRAPH[concept]
+
+    if any(word in normalized for word in ("何に使", "用途", "何の役", "何のため")):
+        fact = facts.get("用途")
+        label = "主な用途"
+    elif any(word in normalized for word in ("なぜ", "どうして", "仕組み", "どういう原理", "理由")):
+        fact = facts.get("仕組み") or facts.get("用途")
+        label = "仕組み・理由"
+    elif any(word in normalized for word in ("例", "例えば", "たとえば")):
+        fact = facts.get("例") or facts.get("用途")
+        label = "具体例"
+    elif any(word in normalized for word in ("もっと詳しく", "もう少し詳しく", "続き")):
+        detail_parts = [
+            f"{label}：{facts[key]}"
+            for key, label in (("仕組み", "仕組み"), ("用途", "用途"), ("例", "例"))
+            if facts.get(key)
+        ]
+        fact = "\n".join(detail_parts) if detail_parts else None
+        label = "補足説明"
+    else:
+        fact = facts.get("仕組み") or facts.get("用途") or facts.get("例")
+        label = "関連する説明"
+
+    if not fact:
+        return None
+    return {
+        "answer": f"**{concept}：{label}**\n{fact}",
+        "plan": [],
+        "intent": "contextual_reasoning",
+        "tools_used": ["conversation_context", "concept_graph"],
+        "context_topic": concept,
+        "reasoning_route": "recent_context_to_verified_concept_relation",
+    }
+
+
 GOVERNANCE_POLICY = (
     "通常の無害な依頼は過剰に拒否せず、利用者が指定した目的・口調・形式・言語を優先する。"
     "安全、プライバシー、認証情報保護、任意コード実行の禁止、外部操作の確認は固定境界として維持する。"
@@ -952,7 +1010,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.7.0"
+    version = "0.8.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -970,6 +1028,9 @@ class LocalAIEngine:
             "君主風の簡潔・断定的な報告スタイル（切替可能）",
             "数学・理科などの基礎知識",
             "質問の種類と必要な処理を自動判定する推論ルーター",
+            "会話履歴から話題を特定する文脈理解",
+            "概念グラフを使った用途・理由・具体例の関連推論",
+            "計算・方程式の結果を代入して検算する自己確認",
             "一次方程式・二次方程式を安全に解く数式処理",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
@@ -1004,6 +1065,9 @@ class LocalAIEngine:
             "automatic_tool_selection": True,
             "question_analysis": True,
             "equation_solver": True,
+            "conversation_context": True,
+            "concept_graph": True,
+            "self_check": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -1224,21 +1288,25 @@ class LocalAIEngine:
         text = request.strip()
         history = history or []
         memories = memories or []
-        del history  # Reserved for the next context-aware engine iteration.
         if not text:
             return {"answer": "メッセージを入力してください。", "plan": [], "intent": "empty", "tools_used": []}
 
         parts = split_requests(text)
         if len(parts) == 1:
+            contextual = _answer_contextual_followup(parts[0], history)
+            if contextual:
+                return self._apply_persona(contextual, sovereign_mode)
             result = self._reply_single(
                 parts[0], memories, document_context
             )
             return self._apply_persona(result, sovereign_mode)
 
-        results = [
-            self._reply_single(part, memories, document_context)
-            for part in parts
-        ]
+        results = []
+        for part in parts:
+            contextual = _answer_contextual_followup(part, history)
+            results.append(
+                contextual or self._reply_single(part, memories, document_context)
+            )
         sections = []
         for index, (part, result) in enumerate(zip(parts, results), 1):
             body = result["answer"].strip()
