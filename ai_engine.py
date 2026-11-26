@@ -397,7 +397,8 @@ def solve_equation(request: str) -> str | None:
         return (
             "**一次方程式の解**\n"
             f"整理すると {b:g}x + ({c:g}) = 0 です。\n"
-            f"x = -({c:g}) / {b:g} = {_format_number(answer)}"
+            f"x = -({c:g}) / {b:g} = {_format_number(answer)}\\n"
+            f"答え：x = {_format_number(answer)}"
         )
 
     discriminant = b * b - 4 * a * c
