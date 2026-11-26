@@ -1659,7 +1659,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.8.0"
+    version = "0.9.0"
 
     def capabilities(self) -> list[str]:
         return [
