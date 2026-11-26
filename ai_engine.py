@@ -680,10 +680,10 @@ class LocalAIEngine:
                 ]
                 for item in references:
                     answer_lines.append(
-                        f"**{item['title']}**\\n{item['extract']}\\n出典: [{item['title']}]({item['url']})"
+                        f"**{item['title']}**\n{item['extract']}\n出典: [{item['title']}]({item['url']})"
                     )
                 return {
-                    "answer": "\\n\\n".join(answer_lines),
+                    "answer": "\n\n".join(answer_lines),
                     "plan": [],
                     "intent": "reference_research",
                     "tools_used": ["wikipedia_reference_search"],
