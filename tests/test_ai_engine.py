@@ -569,3 +569,41 @@ def test_percentage_and_geometry_do_not_emit_non_finite_values():
 
 def test_solver_returns_none_for_nonmatching_statistics_prompt():
     assert ai_engine.solve_statistics("東京の天気を教えて") is None
+
+
+
+def test_combinations_and_permutations():
+    combination = ai_engine.solve_combinatorics("5C2を計算して")
+    assert combination is not None
+    assert "答え：10" in combination
+
+    permutation = ai_engine.solve_combinatorics("5個から2個を選んで並べる順列")
+    assert permutation is not None
+    assert "答え：20" in permutation
+
+
+def test_basic_probability_solver():
+    even = ai_engine.solve_simple_probability("サイコロを1回振って偶数が出る確率")
+    assert even is not None
+    assert "3/6 = 1/2" in even
+    assert "50%" in even
+
+    coin = ai_engine.solve_simple_probability("コインで表が出る確率")
+    assert coin is not None
+    assert "1/2 = 50%" in coin
+
+
+def test_new_reasoning_modules_are_auto_selected():
+    engine = LocalAIEngine()
+    assert engine.reply("5C2を計算して")["intent"] == "combinatorics"
+    assert engine.reply("サイコロを1回振って偶数が出る確率")["intent"] == "probability"
+
+
+def test_new_computing_knowledge():
+    engine = LocalAIEngine()
+    assert "ソフトウェア同士" in engine.reply("APIとは？")["answer"]
+    assert "commit" in engine.reply("Gitとは？")["answer"]
+    assert "SELECT" in engine.reply("SQLとは？")["answer"]
+    assert "過学習" in engine.reply("過学習とは？")["answer"]
+    assert "多数の層" in engine.reply("深層学習とは？")["answer"]
+    assert "RAM" in engine.reply("CPUとメモリの違いは？")["answer"]
