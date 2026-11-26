@@ -530,9 +530,15 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
 
 
 CURRENT_INFO_CUES = (
-    "最新", "今日", "現在の価格", "現在価格", "株価", "為替", "天気",
+    "最新", "今日", "現在", "今の", "本日の", "株価", "為替", "天気",
     "速報", "今週", "昨日", "今日のニュース", "今のニュース",
-    "latest", "current price", "stock price", "exchange rate", "weather", "breaking news",
+    "latest", "current", "today", "stock price", "exchange rate", "weather", "breaking news",
+)
+PRIVATE_QUERY_CUES = (
+    "私の住所", "自分の住所", "私の電話", "電話番号", "メールアドレス",
+    "パスワード", "秘密鍵", "apiキー", "api key", "アクセストークン",
+    "access token", "口座番号", "クレジットカード", "生年月日",
+    "私の氏名", "私の名前", "ログイン情報",
 )
 FACTUAL_QUESTION_CUES = (
     "とは", "って何", "何ですか", "何とは", "なぜ", "どうして", "理由",
@@ -557,6 +563,9 @@ def analyze_question(text: str) -> dict[str, Any]:
 
     if _find_calculation(normalized):
         return {"kind": "calculation", "needs_reference": False, "needs_live_data": False}
+
+    if any(cue in normalized for cue in PRIVATE_QUERY_CUES):
+        return {"kind": "private_or_sensitive", "needs_reference": False, "needs_live_data": False}
 
     if any(cue in normalized for cue in CURRENT_INFO_CUES):
         return {"kind": "current_information", "needs_reference": False, "needs_live_data": True}
@@ -799,6 +808,18 @@ class LocalAIEngine:
                     "sources": references,
                     "reasoning_route": "local_knowledge_miss_then_reference_lookup",
                 }
+
+        if assessment["kind"] == "private_or_sensitive":
+            return {
+                "answer": (
+                    "個人情報や認証情報に関する内容は、外部の参考資料検索へ送りません。"
+                    "この会話で提供された情報や、アプリ内に保存した情報の範囲で確認してください。"
+                ),
+                "plan": [],
+                "intent": "private_or_sensitive",
+                "tools_used": [],
+                "reasoning_route": "privacy_protected_no_external_lookup",
+            }
 
         if assessment["needs_live_data"]:
             answer = (
