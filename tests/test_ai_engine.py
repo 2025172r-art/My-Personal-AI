@@ -50,7 +50,7 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.7.0"
+    assert engine.health()["version"] == "0.8.0"
     assert engine.health()["equation_solver"] is True
     assert engine.health()["reference_search"] is True
     assert engine.health()["automatic_tool_selection"] is True
