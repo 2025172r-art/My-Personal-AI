@@ -476,7 +476,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.4.0"
+    version = "0.5.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -492,6 +492,8 @@ class LocalAIEngine:
             "拡充した内蔵知識ベース",
             "不要な拒否を抑え、利用者の口調・形式・目的を優先（安全境界あり）",
             "君主風の簡潔・断定的な報告スタイル（切替可能）",
+            "フェルマーの最終定理などの数学知識",
+            "利用者が許可した場合のWikipedia参考資料検索と出典表示",
         ]
 
     def tools(self) -> list[dict[str, str]]:
@@ -507,6 +509,7 @@ class LocalAIEngine:
             {"name": "text_analyzer", "description": "文字数・英単語数を数える"},
             {"name": "local_knowledge", "description": "内蔵知識ベースを検索"},
             {"name": "command_policy", "description": "利用者優先の指揮系統と安全境界"},
+            {"name": "wikipedia_research", "description": "許可された場合にWikipediaの概要を検索し出典リンクを表示"},
         ]
 
     def health(self) -> dict[str, Any]:
@@ -517,6 +520,7 @@ class LocalAIEngine:
             "multi_intent": True,
             "user_priority": True,
             "sovereign_style": True,
+            "reference_search": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -546,6 +550,7 @@ class LocalAIEngine:
         text: str,
         memories: list[dict[str, Any]],
         document_context: str,
+        use_knowledge_search: bool = False,
     ) -> dict[str, Any]:
         lowered = text.lower()
 
@@ -666,11 +671,30 @@ class LocalAIEngine:
                 "plan": [], "intent": "memory_context", "tools_used": ["memory_search"],
             }
 
+        if use_knowledge_search:
+            references = search_wikipedia(text)
+            if references:
+                answer_lines = [
+                    "**参考資料から確認した内容です（Wikipediaの概要）。**",
+                    "以下は取得した資料の抜粋です。複雑な問題の完全な解答や証明とは限りません。",
+                ]
+                for item in references:
+                    answer_lines.append(
+                        f"**{item['title']}**\\n{item['extract']}\\n出典: [{item['title']}]({item['url']})"
+                    )
+                return {
+                    "answer": "\\n\\n".join(answer_lines),
+                    "plan": [],
+                    "intent": "reference_research",
+                    "tools_used": ["wikipedia_reference_search"],
+                    "sources": references,
+                }
+
         return {
             "answer": (
                 "このエンジンの内蔵知識だけでは、まだ根拠を確認できません。"
                 "作り話で埋めずに、分かる範囲を正確に答えます。"
-                "質問を少し具体化するか、関連資料を読み込ませてください。"
+                "Wikipediaでの参考資料検索を使うか、関連資料を読み込ませてください。"
             ),
             "plan": [], "intent": "unknown", "tools_used": [],
         }
@@ -682,6 +706,7 @@ class LocalAIEngine:
         memories: list[dict[str, Any]] | None = None,
         document_context: str = "",
         sovereign_mode: bool = True,
+        use_knowledge_search: bool = False,
     ) -> dict[str, Any]:
         text = request.strip()
         history = history or []
@@ -692,10 +717,15 @@ class LocalAIEngine:
 
         parts = split_requests(text)
         if len(parts) == 1:
-            result = self._reply_single(parts[0], memories, document_context)
+            result = self._reply_single(
+                parts[0], memories, document_context, use_knowledge_search
+            )
             return self._apply_persona(result, sovereign_mode)
 
-        results = [self._reply_single(part, memories, document_context) for part in parts]
+        results = [
+            self._reply_single(part, memories, document_context, use_knowledge_search)
+            for part in parts
+        ]
         sections = []
         for index, (part, result) in enumerate(zip(parts, results), 1):
             body = result["answer"].strip()
@@ -740,6 +770,7 @@ def run_agent_task(
     use_web_search: bool = False,
     use_multi_agent: bool = False,
     sovereign_mode: bool = True,
+    use_knowledge_search: bool = False,
 ) -> dict[str, Any]:
     """Backward-compatible entry point; intentionally does not call any model API."""
     del client, use_web_search, use_multi_agent
@@ -749,4 +780,5 @@ def run_agent_task(
         memories=memories,
         document_context=document_context,
         sovereign_mode=sovereign_mode,
+        use_knowledge_search=use_knowledge_search,
     )
