@@ -607,3 +607,30 @@ def test_new_computing_knowledge():
     assert "過学習" in engine.reply("過学習とは？")["answer"]
     assert "多数の層" in engine.reply("深層学習とは？")["answer"]
     assert "RAM" in engine.reply("CPUとメモリの違いは？")["answer"]
+
+
+
+def test_router_labels_combinatorics_and_probability():
+    assert ai_engine.analyze_question("5C2を計算して")["kind"] == "combinatorics"
+    assert ai_engine.analyze_question("サイコロで偶数が出る確率")["kind"] == "probability"
+
+
+def test_context_graph_handles_api_followup():
+    history = [
+        {"role": "user", "content": "APIとは？"},
+        {"role": "assistant", "content": "APIはソフトウェア同士をつなぐ窓口です。"},
+    ]
+    result = LocalAIEngine().reply(
+        "具体例を教えて", history=history, sovereign_mode=False
+    )
+    assert result["intent"] == "contextual_reasoning"
+    assert "天気アプリ" in result["answer"] or "API" in result["answer"]
+
+
+def test_all_v09_tools_are_advertised_in_health():
+    health = LocalAIEngine().health()
+    assert health["version"] == "0.9.0"
+    assert health["combinatorics_solver"] is True
+    assert health["probability_solver"] is True
+    assert health["ohms_law_solver"] is True
+    assert health["density_solver"] is True
