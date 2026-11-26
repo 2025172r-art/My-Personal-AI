@@ -76,9 +76,7 @@ with st.sidebar:
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
     sovereign_mode = st.toggle("君主風・依頼優先モード", value=True)
     st.caption("通常の依頼は不必要に拒否せず、目的・口調・形式の希望を優先します。安全・プライバシー保護は維持します。")
-    online_research = st.toggle("Wikipediaで参考資料を検索", value=False)
-    st.caption("ONにすると、質問文がWikipediaへ送信され、検索結果と出典リンクが回答に表示されます。生成AI APIは使いません。")
-    st.caption("AIエンジン: Python Local Engine v0.5.0")
+    st.caption("AIエンジン: Python Local Engine v0.6.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -126,7 +124,6 @@ with chat_tab:
                     use_web_search=False,
                     use_multi_agent=False,
                     sovereign_mode=sovereign_mode,
-                    use_knowledge_search=online_research,
                 )
             answer = result["answer"]
             store.add_message(st.session_state.session_id, "assistant", answer)
@@ -137,8 +134,12 @@ with chat_tab:
         except Exception as exc:
             st.error(f"処理中にエラーが発生しました: {exc}")
 
-    if st.session_state.get("last_tools_used"):
-        st.caption("使用したローカル機能: " + "、".join(st.session_state.last_tools_used))
+    visible_tools = [
+        tool for tool in st.session_state.get("last_tools_used", [])
+        if tool != "reference_retrieval"
+    ]
+    if visible_tools:
+        st.caption("使用した機能: " + "、".join(visible_tools))
 
     if st.session_state.last_plan:
         with st.expander("今回のAI作業計画を見る", expanded=True):
@@ -278,7 +279,7 @@ with setup_tab:
     st.write("AI処理はPython内で実行します。Supabaseへの記憶保存のみクラウド通信を使います。")
     st.table(
         [
-            {"項目": "AIエンジン", "状態": "Python Local Engine v0.5.0（生成AI API不要）"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v0.6.0（生成AI API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -296,7 +297,7 @@ with setup_tab:
         Supabaseの強いSecretキーはEdge Function内だけで使用し、RenderやGitHubには置きません。
         """
     )
-    st.markdown("**現在のエンジン機能**\n\n- 日本語の基本会話とヘルプ\n- 複数依頼の分割と読みやすい回答レイアウト\n- 君主風・依頼優先モード（安全境界あり）\n- フェルマーの最終定理などの内蔵数学知識\n- 許可時のWikipedia参考資料検索と出典表示\n- 安全な計算・複合単位変換\n- 日時・記憶検索\n- 資料の関連文検索・抽出的な要約\n- タスクの保存・削除\n- 目的別の計画作成\n\n**未対応**：自由な文章生成、任意の命令の完全理解、Web全体を網羅する検索、音声の自動文字起こし。")
+    st.markdown("**現在のエンジン機能**\n\n- 日本語の基本会話とヘルプ\n- 複数依頼の分割と読みやすい回答レイアウト\n- 君主風・依頼優先モード（安全境界あり）\n- 数学・理科などの基礎知識\n- 質問の種類と必要な処理の自動判定\n- 安全な計算・複合単位変換と検算\n- 日時・記憶検索\n- 資料の関連文検索・抽出的な要約\n- タスクの保存・削除\n- 目的別の計画作成\n\n**未対応**：自由な文章生成、任意の命令の完全理解、リアルタイム情報の網羅的な取得、音声の自動文字起こし。")
     st.caption("個人利用向けの初期版です。外部への送信・購入・投稿などは自動実行しません。")
 
 st.divider()
