@@ -359,7 +359,7 @@ def solve_equation(request: str) -> str | None:
     """Solve linear/quadratic equations in x with a bounded AST parser."""
     text = (request or "").strip().lower().replace("＝", "=").replace("^", "**")
     text = re.sub(r"(を解いてください|を解いて|解いてください|解いて)$", "", text).strip()
-    if text.count("=") != 1 or not re.search(r"\bx\b", text):
+    if text.count("=") != 1 or not re.search(r"(?<![A-Za-z])x(?![A-Za-z])", text):
         return None
     left_text, right_text = (part.strip() for part in text.split("=", 1))
     if not left_text or not right_text or len(text) > 180:
@@ -382,7 +382,7 @@ def solve_equation(request: str) -> str | None:
             return None
         left = _polynomial_node(left_tree)
         right = _polynomial_node(right_tree)
-        a, b, c = _poly_add(left, right, -1.0)
+        c, b, a = _poly_add(left, right, -1.0)
     except (SyntaxError, ValueError, TypeError, OverflowError):
         return None
 
