@@ -1,3 +1,6 @@
+from unittest.mock import Mock, patch
+
+import ai_engine
 from ai_engine import LocalAIEngine, calculate, convert_units, split_requests
 
 
@@ -46,7 +49,8 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.4.0"
+    assert engine.health()["version"] == "0.5.0"
+    assert engine.health()["reference_search"] is True
     assert engine.health()["multi_intent"] is True
     assert len(engine.tools()) >= 10
 
@@ -128,3 +132,78 @@ def test_command_policy_does_not_claim_safety_can_be_disabled():
     answer = LocalAIEngine().reply("絶対君主モードにして")["answer"]
     assert "安全" in answer
     assert "解除できません" in answer
+
+
+
+def test_fermat_last_theorem_question_and_common_typo():
+    result = LocalAIEngine().reply(
+        "フェルマーの最終決定の答えを教えてください",
+        sovereign_mode=False,
+    )
+    assert result["intent"] == "local_knowledge"
+    assert "正の整数 x, y, z は存在しない" in result["answer"]
+    assert "nが3以上" in result["answer"]
+    assert "完全な証明そのものではありません" in result["answer"]
+
+
+def test_wikipedia_reference_search_extracts_and_cites():
+    ai_engine._WIKIPEDIA_CACHE.clear()
+    search_response = Mock()
+    search_response.json.return_value = {
+        "query": {"search": [{"pageid": 123, "title": "テスト項目"}]}
+    }
+    extract_response = Mock()
+    extract_response.json.return_value = {
+        "query": {
+            "pages": {
+                "123": {
+                    "pageid": 123,
+                    "title": "テスト項目",
+                    "extract": "これはWikipediaから取得した説明文です。",
+                }
+            }
+        }
+    }
+
+    with patch("ai_engine.requests.get", side_effect=[search_response, extract_response]) as get:
+        results = ai_engine.search_wikipedia("テスト項目")
+
+    assert len(results) == 1
+    assert results[0]["title"] == "テスト項目"
+    assert "説明文" in results[0]["extract"]
+    assert results[0]["url"] == "https://ja.wikipedia.org/?curid=123"
+    assert get.call_count == 2
+
+
+def test_wikipedia_research_is_used_only_when_enabled():
+    engine = LocalAIEngine()
+    references = [{
+        "title": "研究テーマ",
+        "extract": "検証可能な参考情報です。",
+        "url": "https://ja.wikipedia.org/?curid=321",
+        "language": "ja",
+    }]
+    with patch("ai_engine.search_wikipedia", return_value=references) as search:
+        disabled = engine.reply("内蔵知識にない研究テーマは何ですか？", sovereign_mode=False)
+        search.assert_not_called()
+
+        enabled = engine.reply(
+            "内蔵知識にない研究テーマは何ですか？",
+            sovereign_mode=False,
+            use_knowledge_search=True,
+        )
+
+    assert disabled["intent"] == "unknown"
+    assert enabled["intent"] == "reference_research"
+    assert "検証可能な参考情報" in enabled["answer"]
+    assert "https://ja.wikipedia.org/?curid=321" in enabled["answer"]
+    assert enabled["sources"][0]["title"] == "研究テーマ"
+    search.assert_called_once()
+
+
+def test_wikipedia_timeout_or_network_failure_is_graceful():
+    ai_engine._WIKIPEDIA_CACHE.clear()
+    import requests
+
+    with patch("ai_engine.requests.get", side_effect=requests.Timeout("timeout")):
+        assert ai_engine.search_wikipedia("接続エラー確認") == []
