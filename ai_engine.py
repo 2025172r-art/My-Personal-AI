@@ -510,6 +510,27 @@ def _polynomial_node(node: ast.AST, depth: int = 0) -> tuple[float, float, float
     raise ValueError("対応していない式です。")
 
 
+
+def verify_polynomial_roots(
+    a: float,
+    b: float,
+    c: float,
+    roots: list[float] | tuple[float, ...],
+    tolerance: float = 1e-8,
+) -> bool:
+    """Substitute each candidate root back into ax²+bx+c and check its residual."""
+    if not roots:
+        return False
+    for root in roots:
+        if not math.isfinite(root):
+            return False
+        residual = a * root * root + b * root + c
+        scale = max(1.0, abs(a * root * root), abs(b * root), abs(c))
+        if not math.isfinite(residual) or abs(residual) > tolerance * scale:
+            return False
+    return True
+
+
 def solve_equation(request: str) -> str | None:
     """Solve linear/quadratic equations in x with a bounded AST parser."""
     text = (request or "").strip().lower().replace("＝", "=").replace("^", "**")
@@ -549,6 +570,8 @@ def solve_equation(request: str) -> str | None:
 
     if abs(a) < epsilon:
         answer = -c / b
+        if not verify_polynomial_roots(0.0, b, c, [answer]):
+            return None
         return (
             "**一次方程式の解**\n"
             f"整理すると {b:g}x + ({c:g}) = 0 です。\n"
@@ -565,6 +588,8 @@ def solve_equation(request: str) -> str | None:
         )
     if abs(discriminant) <= epsilon:
         root = -b / (2 * a)
+        if not verify_polynomial_roots(a, b, c, [root]):
+            return None
         return (
             "**二次方程式の解**\n"
             "判別式 D = 0 なので重解です。\n"
@@ -573,6 +598,8 @@ def solve_equation(request: str) -> str | None:
 
     root_d = math.sqrt(discriminant)
     roots = sorted(((-b - root_d) / (2 * a), (-b + root_d) / (2 * a)))
+    if not verify_polynomial_roots(a, b, c, roots):
+        return None
     return (
         "**二次方程式の解**\n"
         f"判別式 D = b² - 4ac = {_format_number(discriminant)} です。\n"
