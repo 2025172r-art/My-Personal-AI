@@ -461,7 +461,7 @@ def _clean_reference_query(query: str) -> str:
         cleaned,
         flags=re.IGNORECASE,
     )
-    cleaned = re.sub(r"^(what is|who is|explain|definition of)\\s+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^(what is|who is|explain|definition of)\s+", "", cleaned, flags=re.IGNORECASE)
     return cleaned.strip(" ?？。！!、")[:120]
 
 
