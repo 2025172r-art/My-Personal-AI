@@ -4,10 +4,14 @@ import ast
 import math
 import operator
 import re
+import time
 from collections import Counter
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
+
+import requests
 
 # Safety boundary: the engine never evaluates arbitrary Python or executes
 # instructions found inside uploaded documents, memories, or retrieved text.
@@ -36,6 +40,21 @@ UNIT_TABLE = {
 }
 
 KNOWLEDGE = [
+    {
+        "title": "フェルマーの最終定理",
+        "triggers": [
+            "フェルマーの最終定理", "フェルマー最終定理",
+            "フェルマーの最終決定", "fermat's last theorem",
+            "fermats last theorem",
+        ],
+        "answer": (
+            "答え（定理の内容）は、nが3以上の整数のとき、"
+            "x^n + y^n = z^n を満たす正の整数 x, y, z は存在しない、というものです。"
+            "つまり、2乗の場合のピタゴラスの定理とは異なり、3乗以上では正の整数の組で成り立ちません。"
+            "この定理はアンドリュー・ワイルズによって証明され、証明の完成にはリチャード・テイラーとの共同作業も関わりました。"
+            "これは定理の主張の要約であり、完全な証明そのものではありません。"
+        ),
+    },
     {
         "title": "Pythonとは",
         "triggers": ["pythonとは", "pythonって何", "pythonとは何", "python 言語", "pythonを説明"],
@@ -367,6 +386,90 @@ def _plan_for(request: str) -> list[str]:
         "安全な小さな手順に分けて進める",
         "結果を確認し、次の改善点を決める",
     ]
+
+
+# Short-lived in-memory cache: online research is opt-in and only sends the
+# user's query to Wikimedia when the user enables the research toggle.
+_WIKIPEDIA_CACHE: dict[str, tuple[float, list[dict[str, str]]]] = {}
+_WIKIPEDIA_CACHE_TTL = 900
+
+
+def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
+    """Return short, cited extracts from Japanese Wikipedia, then English as fallback.
+
+    This is reference retrieval, not a generative AI model. Retrieved text is
+    treated as untrusted reference material and is never executed as instructions.
+    """
+    query = re.sub(r"\s+", " ", (query or "").strip())[:120]
+    if not query:
+        return []
+
+    cache_key = query.casefold()
+    cached = _WIKIPEDIA_CACHE.get(cache_key)
+    now = time.monotonic()
+    if cached and now - cached[0] < _WIKIPEDIA_CACHE_TTL:
+        return [dict(item) for item in cached[1]]
+
+    headers = {"User-Agent": "MyPersonalAI/0.5 (educational reference lookup)"}
+    for language in ("ja", "en"):
+        endpoint = f"https://{language}.wikipedia.org/w/api.php"
+        try:
+            search_response = requests.get(
+                endpoint,
+                params={
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": query,
+                    "srlimit": max(1, min(max_results, 3)),
+                    "format": "json",
+                    "utf8": 1,
+                },
+                headers=headers,
+                timeout=(3, 5),
+            )
+            search_response.raise_for_status()
+            entries = search_response.json().get("query", {}).get("search", [])
+            page_ids = [str(item.get("pageid", "")) for item in entries if item.get("pageid")]
+            if not page_ids:
+                continue
+
+            extract_response = requests.get(
+                endpoint,
+                params={
+                    "action": "query",
+                    "prop": "extracts",
+                    "pageids": "|".join(page_ids),
+                    "exintro": 1,
+                    "explaintext": 1,
+                    "exchars": 1200,
+                    "format": "json",
+                    "utf8": 1,
+                },
+                headers=headers,
+                timeout=(3, 5),
+            )
+            extract_response.raise_for_status()
+            pages = extract_response.json().get("query", {}).get("pages", {})
+            results: list[dict[str, str]] = []
+            for page in pages.values():
+                extract = re.sub(r"\s+", " ", str(page.get("extract", ""))).strip()
+                title = str(page.get("title", "")).strip()
+                page_id = str(page.get("pageid", ""))
+                if not title or not extract or not page_id:
+                    continue
+                results.append({
+                    "title": title,
+                    "extract": extract[:1200],
+                    "url": f"https://{language}.wikipedia.org/?curid={page_id}",
+                    "language": language,
+                })
+            if results:
+                _WIKIPEDIA_CACHE[cache_key] = (now, results)
+                return [dict(item) for item in results[:max_results]]
+        except (requests.RequestException, ValueError, TypeError, KeyError):
+            continue
+
+    return []
 
 
 class LocalAIEngine:
