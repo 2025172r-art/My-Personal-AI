@@ -453,7 +453,7 @@ _WIKIPEDIA_CACHE_TTL = 900
 
 def _clean_reference_query(query: str) -> str:
     """Keep only the factual topic before sending a query to the reference service."""
-    cleaned = re.sub(r"\\s+", " ", (query or "").strip())
+    cleaned = re.sub(r"\s+", " ", (query or "").strip())
     cleaned = cleaned.strip(" ?？。！!、")
     cleaned = re.sub(
         r"(とは何ですか|とは何|とは|って何ですか|って何|について教えてください|について教えて|について調べて|を教えてください|を教えて)$",
@@ -471,7 +471,7 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
     This is reference retrieval, not a generative AI model. Retrieved text is
     treated as untrusted reference material and is never executed as instructions.
     """
-    query = re.sub(r"\s+", " ", (query or "").strip())[:120]
+    query = _clean_reference_query(query)
     if not query:
         return []
 
