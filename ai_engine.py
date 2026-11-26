@@ -247,6 +247,64 @@ KNOWLEDGE = [
         "triggers": ["安全なパスワード", "パスワードの作り方"],
         "answer": "長く、他のサービスと使い回さず、推測しにくいパスワードを使います。パスワードやAPIキーをチャット、コード、公開リポジトリに貼らないでください。",
     },
+
+    {
+        "title": "エネルギー保存の法則",
+        "triggers": ["エネルギー保存の法則", "エネルギー保存とは", "エネルギーは保存される"],
+        "answer": (
+            "エネルギー保存の法則は、外部とのエネルギーの出入りがない閉じた系では、"
+            "エネルギーの総量が一定に保たれるという法則です。"
+            "運動エネルギーが位置エネルギーや熱などに変わることはありますが、"
+            "エネルギーが何もないところから生まれたり、完全に消えたりするわけではありません。"
+        ),
+    },
+    {
+        "title": "平均値・中央値・最頻値",
+        "triggers": ["平均値とは", "中央値とは", "最頻値とは", "平均と中央値の違い"],
+        "answer": (
+            "平均値は、すべての値を足して個数で割った値です。"
+            "中央値は、小さい順に並べたとき中央にくる値です。"
+            "最頻値は、最も多く現れる値です。"
+            "極端に大きい値や小さい値があると平均値は影響を受けやすいため、中央値も確認するとデータの特徴をつかみやすくなります。"
+        ),
+    },
+    {
+        "title": "生態系とは",
+        "triggers": ["生態系とは", "生態系って何", "食物連鎖とは"],
+        "answer": (
+            "生態系は、ある場所にいる生物と、それを取り巻く光・水・土壌・気温などの環境を合わせたまとまりです。"
+            "生産者、消費者、分解者の間で物質が循環し、食物網を通してエネルギーが流れます。"
+            "一つの種や環境の変化が、ほかの生物にも影響することがあります。"
+        ),
+    },
+    {
+        "title": "電気回路の直列接続と並列接続",
+        "triggers": ["直列回路とは", "並列回路とは", "直列と並列の違い"],
+        "answer": (
+            "直列接続では部品を一列につなぐため、各部品に同じ電流が流れ、電圧は分かれます。"
+            "並列接続では部品を枝分かれさせてつなぐため、各枝の電圧は等しく、電流が分かれます。"
+            "合成抵抗は、直列では足し算、並列では逆数の和で求めます。"
+        ),
+    },
+    {
+        "title": "HTMLとCSSとは",
+        "triggers": ["htmlとは", "cssとは", "htmlとcssの違い"],
+        "answer": (
+            "HTMLはWebページの文章や見出し、画像などの構造を記述する言語です。"
+            "CSSは文字色、配置、余白、画面幅に応じた見た目などを指定します。"
+            "HTMLがページの骨組み、CSSがデザインを担当すると考えると分かりやすいです。"
+        ),
+    },
+    {
+        "title": "確率とは",
+        "triggers": ["確率とは", "確率って何", "確率の求め方"],
+        "answer": (
+            "確率は、ある事象の起こりやすさを0から1までの数で表したものです。"
+            "すべての結果が同じ確からしさで起こる場合、"
+            "確率は『その事象が起こる場合の数 ÷ すべての場合の数』で求められます。"
+            "例えば公平な6面サイコロで偶数が出る確率は3/6=1/2です。"
+        ),
+    },
 ]
 
 STOP_WORDS = {
@@ -254,6 +312,103 @@ STOP_WORDS = {
     "もの", "ため", "から", "まで", "について", "教えて", "ください", "お願い",
     "とは", "って", "何", "どの", "どんな", "ある", "いる", "でした",
 }
+
+# Compact concept graph for follow-up questions. This is explicit, inspectable
+# knowledge—not a hidden language model or a claim of model training.
+CONCEPT_GRAPH: dict[str, dict[str, str]] = {
+    "電磁誘導": {
+        "用途": "発電機、変圧器、IH調理器、非接触充電などに応用されます。発電機では磁界とコイルの相対運動で磁束を変化させ、電気エネルギーを取り出します。",
+        "仕組み": "コイルを通る磁束が時間とともに変化すると起電力が生じます。誘導電流は磁束の変化を妨げる向きに流れます（レンツの法則）。",
+        "例": "磁石をコイルに近づける、コイルを磁界の中で動かす、発電機を回す、といった例があります。",
+    },
+    "オームの法則": {
+        "用途": "回路の電圧・電流・抵抗のうち二つが分かっているとき、残り一つを求めるために使います。",
+        "例": "4Ωの抵抗に2Aの電流が流れるなら、V=IR=4×2=8Vです。",
+    },
+    "光合成": {
+        "用途": "植物などが光エネルギーを化学エネルギーとして有機物に蓄える働きがあり、生態系の多くの食物網を支えています。",
+        "仕組み": "葉緑体で光エネルギーを利用し、水と二酸化炭素から有機物を作ります。酸素を放出する型では水由来の酸素が放出されます。",
+        "例": "日光の当たる葉で二酸化炭素を取り込み、糖などの有機物を合成します。",
+    },
+    "DNA": {
+        "用途": "遺伝情報の保存と複製に関わり、細胞がRNAやタンパク質を作る際の情報源になります。",
+        "仕組み": "DNAの塩基配列に情報が記録され、必要な部分がRNAへ転写されます。RNAの情報はタンパク質合成などに利用されます。",
+        "例": "細胞分裂の前にDNAが複製され、遺伝情報が娘細胞へ受け継がれます。",
+    },
+    "重力": {
+        "用途": "惑星や衛星の軌道、物体の落下、潮汐など多くの現象を説明するのに使われます。",
+        "仕組み": "ニュートン力学では質量を持つ物体同士の引力として表し、一般相対性理論では時空の曲がりとして説明します。",
+        "例": "地球の重力によって、手を離した物体は地面に向かって落ちます。",
+    },
+    "アルゴリズム": {
+        "用途": "検索、並べ替え、経路探索、データ圧縮、スケジュール作成など、明確な手順が必要な問題に使います。",
+        "例": "辞書の単語を探すとき、順番に確認する方法や、範囲を半分ずつ絞る二分探索などがあります。",
+    },
+}
+FOLLOWUP_CUES = (
+    "それは", "それが", "それを", "それの", "それって", "これは", "これが",
+    "この仕組み", "その理由", "なぜ", "どうして", "何に使", "用途",
+    "例を", "例えば", "もっと詳しく", "もう少し詳しく", "続き",
+)
+
+
+def _recent_concept(history: list[dict[str, Any]]) -> str | None:
+    """Resolve a follow-up only to a known concept named in recent chat turns."""
+    recent_text = " ".join(
+        str(item.get("content", ""))[:2000]
+        for item in history[-6:]
+        if item.get("role") in {"user", "assistant"}
+    )
+    matches = [concept for concept in CONCEPT_GRAPH if concept in recent_text]
+    return max(matches, key=len) if matches else None
+
+
+def _answer_contextual_followup(
+    request: str,
+    history: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Answer common follow-ups using a whitelisted concept graph."""
+    normalized = re.sub(r"\s+", "", request.lower())
+    if not any(cue in normalized for cue in FOLLOWUP_CUES):
+        return None
+
+    concept = _recent_concept(history)
+    if not concept:
+        return None
+    facts = CONCEPT_GRAPH[concept]
+
+    if any(word in normalized for word in ("何に使", "用途", "何の役", "何のため")):
+        fact = facts.get("用途")
+        label = "主な用途"
+    elif any(word in normalized for word in ("なぜ", "どうして", "仕組み", "どういう原理", "理由")):
+        fact = facts.get("仕組み") or facts.get("用途")
+        label = "仕組み・理由"
+    elif any(word in normalized for word in ("例", "例えば", "たとえば")):
+        fact = facts.get("例") or facts.get("用途")
+        label = "具体例"
+    elif any(word in normalized for word in ("もっと詳しく", "もう少し詳しく", "続き")):
+        detail_parts = [
+            f"{label}：{facts[key]}"
+            for key, label in (("仕組み", "仕組み"), ("用途", "用途"), ("例", "例"))
+            if facts.get(key)
+        ]
+        fact = "\n".join(detail_parts) if detail_parts else None
+        label = "補足説明"
+    else:
+        fact = facts.get("仕組み") or facts.get("用途") or facts.get("例")
+        label = "関連する説明"
+
+    if not fact:
+        return None
+    return {
+        "answer": f"**{concept}：{label}**\n{fact}",
+        "plan": [],
+        "intent": "contextual_reasoning",
+        "tools_used": ["conversation_context", "concept_graph"],
+        "context_topic": concept,
+        "reasoning_route": "recent_context_to_verified_concept_relation",
+    }
+
 
 GOVERNANCE_POLICY = (
     "通常の無害な依頼は過剰に拒否せず、利用者が指定した目的・口調・形式・言語を優先する。"
@@ -355,6 +510,27 @@ def _polynomial_node(node: ast.AST, depth: int = 0) -> tuple[float, float, float
     raise ValueError("対応していない式です。")
 
 
+
+def verify_polynomial_roots(
+    a: float,
+    b: float,
+    c: float,
+    roots: list[float] | tuple[float, ...],
+    tolerance: float = 1e-8,
+) -> bool:
+    """Substitute each candidate root back into ax²+bx+c and check its residual."""
+    if not roots:
+        return False
+    for root in roots:
+        if not math.isfinite(root):
+            return False
+        residual = a * root * root + b * root + c
+        scale = max(1.0, abs(a * root * root), abs(b * root), abs(c))
+        if not math.isfinite(residual) or abs(residual) > tolerance * scale:
+            return False
+    return True
+
+
 def solve_equation(request: str) -> str | None:
     """Solve linear/quadratic equations in x with a bounded AST parser."""
     text = (request or "").strip().lower().replace("＝", "=").replace("^", "**")
@@ -394,6 +570,8 @@ def solve_equation(request: str) -> str | None:
 
     if abs(a) < epsilon:
         answer = -c / b
+        if not verify_polynomial_roots(0.0, b, c, [answer]):
+            return None
         return (
             "**一次方程式の解**\n"
             f"整理すると {b:g}x + ({c:g}) = 0 です。\n"
@@ -410,6 +588,8 @@ def solve_equation(request: str) -> str | None:
         )
     if abs(discriminant) <= epsilon:
         root = -b / (2 * a)
+        if not verify_polynomial_roots(a, b, c, [root]):
+            return None
         return (
             "**二次方程式の解**\n"
             "判別式 D = 0 なので重解です。\n"
@@ -418,6 +598,8 @@ def solve_equation(request: str) -> str | None:
 
     root_d = math.sqrt(discriminant)
     roots = sorted(((-b - root_d) / (2 * a), (-b + root_d) / (2 * a)))
+    if not verify_polynomial_roots(a, b, c, roots):
+        return None
     return (
         "**二次方程式の解**\n"
         f"判別式 D = b² - 4ac = {_format_number(discriminant)} です。\n"
@@ -855,7 +1037,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.7.0"
+    version = "0.8.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -873,6 +1055,9 @@ class LocalAIEngine:
             "君主風の簡潔・断定的な報告スタイル（切替可能）",
             "数学・理科などの基礎知識",
             "質問の種類と必要な処理を自動判定する推論ルーター",
+            "会話履歴から話題を特定する文脈理解",
+            "概念グラフを使った用途・理由・具体例の関連推論",
+            "計算・方程式の結果を代入して検算する自己確認",
             "一次方程式・二次方程式を安全に解く数式処理",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
@@ -907,6 +1092,9 @@ class LocalAIEngine:
             "automatic_tool_selection": True,
             "question_analysis": True,
             "equation_solver": True,
+            "conversation_context": True,
+            "concept_graph": True,
+            "self_check": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -1127,21 +1315,25 @@ class LocalAIEngine:
         text = request.strip()
         history = history or []
         memories = memories or []
-        del history  # Reserved for the next context-aware engine iteration.
         if not text:
             return {"answer": "メッセージを入力してください。", "plan": [], "intent": "empty", "tools_used": []}
 
         parts = split_requests(text)
         if len(parts) == 1:
+            contextual = _answer_contextual_followup(parts[0], history)
+            if contextual:
+                return self._apply_persona(contextual, sovereign_mode)
             result = self._reply_single(
                 parts[0], memories, document_context
             )
             return self._apply_persona(result, sovereign_mode)
 
-        results = [
-            self._reply_single(part, memories, document_context)
-            for part in parts
-        ]
+        results = []
+        for part in parts:
+            contextual = _answer_contextual_followup(part, history)
+            results.append(
+                contextual or self._reply_single(part, memories, document_context)
+            )
         sections = []
         for index, (part, result) in enumerate(zip(parts, results), 1):
             body = result["answer"].strip()

@@ -50,7 +50,7 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.7.0"
+    assert engine.health()["version"] == "0.8.0"
     assert engine.health()["equation_solver"] is True
     assert engine.health()["reference_search"] is True
     assert engine.health()["automatic_tool_selection"] is True
@@ -376,3 +376,66 @@ def test_expanded_science_and_programming_knowledge():
     assert "陽子と中性子" in engine.reply("原子の構造を説明して")["answer"]
     assert "アルゴリズム" in engine.reply("アルゴリズムとは？")["answer"]
     assert "世代を経て変化" in engine.reply("生物の進化とは？")["answer"]
+
+
+
+def test_conversation_context_resolves_electric_induction_followup():
+    history = [
+        {"role": "user", "content": "電磁誘導とは？"},
+        {"role": "assistant", "content": "**電磁誘導とは**\nコイルを通る磁束が変化すると起電力が生じます。"},
+    ]
+    result = LocalAIEngine().reply(
+        "それは何に使われるの？",
+        history=history,
+        sovereign_mode=False,
+    )
+    assert result["intent"] == "contextual_reasoning"
+    assert result["context_topic"] == "電磁誘導"
+    assert "発電機" in result["answer"]
+    assert "変圧器" in result["answer"]
+
+
+def test_conversation_context_resolves_why_followup():
+    history = [
+        {"role": "user", "content": "光合成とは？"},
+        {"role": "assistant", "content": "**光合成とは** 光エネルギーを利用して有機物を作ります。"},
+    ]
+    result = LocalAIEngine().reply("なぜそれが大切なの？", history=history, sovereign_mode=False)
+    assert result["intent"] == "contextual_reasoning"
+    assert result["context_topic"] == "光合成"
+    assert "化学エネルギー" in result["answer"] or "有機物" in result["answer"]
+
+
+def test_context_router_does_not_guess_without_a_recent_topic():
+    result = ai_engine._answer_contextual_followup("それは何に使われるの？", [])
+    assert result is None
+
+
+def test_equation_roots_are_substituted_back_for_self_check():
+    assert ai_engine.verify_polynomial_roots(1, -5, 6, [2, 3]) is True
+    assert ai_engine.verify_polynomial_roots(1, -5, 6, [2, 4]) is False
+    assert ai_engine.verify_polynomial_roots(0, 2, -4, [2]) is True
+
+
+def test_v08_expanded_knowledge():
+    engine = LocalAIEngine()
+    assert "位置エネルギー" in engine.reply("エネルギー保存の法則とは？")["answer"]
+    assert "中央値" in engine.reply("平均値と中央値の違いは？")["answer"]
+    assert "生産者" in engine.reply("生態系とは？")["answer"]
+    assert "電流" in engine.reply("直列回路と並列回路の違いは？")["answer"]
+    assert "HTML" in engine.reply("HTMLとは？")["answer"]
+    assert "0から1" in engine.reply("確率とは？")["answer"]
+
+
+def test_reply_uses_history_instead_of_discarding_it():
+    history = [
+        {"role": "user", "content": "オームの法則とは？"},
+        {"role": "assistant", "content": "**オームの法則** V=IRという関係です。"},
+    ]
+    result = LocalAIEngine().reply(
+        "具体例を教えて",
+        history=history,
+        sovereign_mode=False,
+    )
+    assert result["intent"] == "contextual_reasoning"
+    assert "4Ω" in result["answer"]
