@@ -50,7 +50,7 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.9.0"
+    assert engine.health()["version"] == "1.0.0"
     assert engine.health()["equation_solver"] is True
     assert engine.health()["statistics_engine"] is True
     assert engine.health()["percentage_solver"] is True
@@ -629,8 +629,126 @@ def test_context_graph_handles_api_followup():
 
 def test_all_v09_tools_are_advertised_in_health():
     health = LocalAIEngine().health()
-    assert health["version"] == "0.9.0"
+    assert health["version"] == "1.0.0"
     assert health["combinatorics_solver"] is True
     assert health["probability_solver"] is True
     assert health["ohms_law_solver"] is True
     assert health["density_solver"] is True
+
+
+
+def test_v10_simultaneous_linear_equations_solver():
+    result = ai_engine.solve_linear_system("連立方程式 2x+y=5、x-y=1")
+    assert result is not None
+    assert "x = 2" in result
+    assert "y = 1" in result
+    assert "検算" in result
+
+
+def test_v10_simultaneous_equations_with_parentheses():
+    result = ai_engine.solve_linear_system("連立方程式 3(x+y)=9; x-y=1")
+    assert result is not None
+    assert "x = 2" in result
+    assert "y = 1" in result
+
+
+def test_v10_dependent_and_inconsistent_linear_systems():
+    dependent = ai_engine.solve_linear_system("x+y=2; 2x+2y=4")
+    assert dependent is not None
+    assert "一つに定まりません" in dependent
+    inconsistent = ai_engine.solve_linear_system("x+y=2; x+y=3")
+    assert inconsistent is not None
+    assert "解はありません" in inconsistent
+
+
+def test_v10_number_theory_tools():
+    factors = ai_engine.solve_number_theory("360を素因数分解して")
+    assert factors is not None
+    assert "2^3" in factors
+    assert "3^2" in factors
+    assert "5" in factors
+
+    gcd = ai_engine.solve_number_theory("12と18の最大公約数")
+    assert gcd is not None
+    assert "6" in gcd
+
+    lcm = ai_engine.solve_number_theory("4と6の最小公倍数")
+    assert lcm is not None
+    assert "12" in lcm
+
+
+def test_v10_chemistry_formula_parser_and_molar_mass():
+    water = ai_engine.solve_molar_mass("H2Oのモル質量を求めて")
+    assert water is not None
+    assert "18.02 g/mol" in water
+
+    calcium_hydroxide = ai_engine.solve_molar_mass("Ca(OH)2の分子量を求めて")
+    assert calcium_hydroxide is not None
+    assert "74.09 g/mol" in calcium_hydroxide
+
+    assert ai_engine.solve_molar_mass("Xx3のモル質量を求めて") is None
+
+
+def test_v10_solver_routing():
+    engine = LocalAIEngine()
+    assert engine.reply("連立方程式 2x+y=5; x-y=1")["intent"] == "linear_system_solving"
+    assert engine.reply("360を素因数分解して")["intent"] == "number_theory"
+    assert engine.reply("H2Oのモル質量を求めて")["intent"] == "chemistry_calculation"
+
+
+def test_v10_local_intent_classifier_predicts_common_intents():
+    from learning_brain import train_default_classifier
+
+    classifier = train_default_classifier()
+    assert classifier.predict("新しいPythonプログラムのコードを書いて")["label"] == "coding"
+    assert classifier.predict("天気の最新情報を知りたい")["label"] == "current_information"
+    assert classifier.predict("勉強の計画を順番に作って")["label"] == "planning"
+    assert classifier.predict("光合成の仕組みを教えて")["label"] == "factual_question"
+
+
+def test_v10_user_learning_examples_retrain_classifier():
+    from learning_brain import examples_from_memories, train_default_classifier
+
+    memories = [{
+        "category": "AI学習例",
+        "content": "計画 | この独自の文章を作業予定に整理してほしい",
+    }]
+    examples = examples_from_memories(memories)
+    assert examples == [("この独自の文章を作業予定に整理してほしい", "planning")]
+    prediction = train_default_classifier(memories).predict(
+        "この独自の文章を作業予定に整理してほしい"
+    )
+    assert prediction["label"] == "planning"
+
+
+def test_v10_analyzer_uses_user_learning_examples():
+    memories = [{
+        "category": "AI学習例",
+        "content": "計画 | この独自フレーズを作業予定に分類する",
+    }]
+    result = ai_engine.analyze_question("この独自フレーズを作業予定に分類する", memories)
+    assert result["model_intent"] == "planning"
+    assert result["intent_hint"] == "planning"
+
+
+def test_v10_runtime_learned_planning_route():
+    memories = [{
+        "category": "AI学習例",
+        "content": "計画 | この特殊な依頼をタスク群Aとして整理して",
+    }]
+    result = LocalAIEngine().reply(
+        "この特殊な依頼をタスク群Aとして整理して",
+        memories=memories,
+        sovereign_mode=False,
+    )
+    assert result["intent"] == "learned_planning"
+    assert "task_planner" in result["tools_used"]
+
+
+def test_v10_health_exposes_new_brain_modules():
+    health = LocalAIEngine().health()
+    assert health["version"] == "1.0.0"
+    assert health["linear_system_solver"] is True
+    assert health["number_theory"] is True
+    assert health["chemistry_formula"] is True
+    assert health["trainable_intent_classifier"] is True

@@ -76,7 +76,7 @@ with st.sidebar:
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
     sovereign_mode = st.toggle("君主風・依頼優先モード", value=True)
     st.caption("通常の依頼は不必要に拒否せず、目的・口調・形式の希望を優先します。安全・プライバシー保護は維持します。")
-    st.caption("AIエンジン: Python Local Engine v0.9.0")
+    st.caption("AIエンジン: Python Local Engine v1.0.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -223,7 +223,9 @@ with memory_tab:
     st.subheader("長期記憶")
     st.write("AIに覚えておいてほしい情報だけを明示的に保存します。")
     with st.form("memory_form", clear_on_submit=True):
-        category = st.selectbox("カテゴリ", ["好み", "目標", "プロジェクト", "設定", "その他"])
+        category = st.selectbox("カテゴリ", ["好み", "目標", "プロジェクト", "設定", "その他", "AI学習例"])
+        if category == "AI学習例":
+            st.caption("質問分類の追加学習例です。形式：ラベル | 例文。ラベルは 計算 / 事実質問 / 計画 / プログラミング / 要約 / 創作 / 会話 / 最新情報 が使えます。例：計画 | 文化祭の準備を順番に整理したい")
         memory_text = st.text_area("記憶する内容")
         save_memory = st.form_submit_button("記憶に保存", type="primary")
     if save_memory and memory_text.strip():
@@ -279,7 +281,7 @@ with setup_tab:
     st.write("AI処理はPython内で実行します。Supabaseへの記憶保存のみクラウド通信を使います。")
     st.table(
         [
-            {"項目": "AIエンジン", "状態": "Python Local Engine v0.9.0（生成AI API不要）"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v1.0.0（生成AI API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -297,7 +299,32 @@ with setup_tab:
         Supabaseの強いSecretキーはEdge Function内だけで使用し、RenderやGitHubには置きません。
         """
     )
-    st.markdown("**現在のエンジン機能**\n\n- 日本語の基本会話とヘルプ\n- 複数依頼の分割と読みやすい回答レイアウト\n- 君主風・依頼優先モード（安全境界あり）\n- 数学・理科・プログラミングの基礎知識\n- 一次方程式・二次方程式の自動解法と検算\n- 割合・割引・百分率の文章題\n- 平均値・中央値・最頻値・分散・標準偏差の統計\n- 円・長方形・三角形の面積と円周\n- 速さ・距離・時間の文章題\n- オームの法則・密度の計算\n- 組合せ・順列・基本確率の計算\n- API・HTTP・Git・SQL・機械学習などの情報知識\n- 会話の文脈理解と概念関係の推論\n- 質問の種類と必要な処理の自動判定\n- 安全な計算・複合単位変換と検算\n- 日時・記憶検索\n- 資料の関連文検索・抽出的な要約\n- タスクの保存・削除\n- 目的別の計画作成\n\n**未対応**：自由な文章生成、任意の命令の完全理解、リアルタイム情報の網羅的な取得、音声の自動文字起こし。")
+    st.markdown("""**現在のエンジン機能**
+
+- 日本語の基本会話とヘルプ
+- 複数依頼の分割と読みやすい回答レイアウト
+- 君主風・依頼優先モード（安全境界あり）
+- 数学・理科・プログラミングの基礎知識
+- 一次方程式・二次方程式・連立一次方程式の自動解法と検算
+- 最大公約数・最小公倍数・素因数分解
+- 化学式からモル質量を計算
+- 長期記憶の学習例を使った質問分類モデル
+- 割合・割引・百分率の文章題
+- 平均値・中央値・最頻値・分散・標準偏差の統計
+- 円・長方形・三角形の面積と円周
+- 速さ・距離・時間の文章題
+- オームの法則・密度の計算
+- 組合せ・順列・基本確率の計算
+- API・HTTP・Git・SQL・機械学習などの情報知識
+- 会話の文脈理解と概念関係の推論
+- 質問の種類と必要な処理の自動判定
+- 安全な計算・複合単位変換と検算
+- 日時・記憶検索
+- 資料の関連文検索・抽出的な要約
+- タスクの保存・削除
+- 目的別の計画作成
+
+**未対応**：自由な文章生成、任意の命令の完全理解、リアルタイム情報の網羅的な取得、音声の自動文字起こし。""")
     st.caption("個人利用向けの初期版です。外部への送信・購入・投稿などは自動実行しません。")
 
 st.divider()
