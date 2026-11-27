@@ -13,6 +13,9 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from learning_brain import train_default_classifier
+from math_brain import solve_linear_system, solve_molar_mass, solve_number_theory
+
 # Safety boundary: the engine never evaluates arbitrary Python or executes
 # instructions found inside uploaded documents, memories, or retrieved text.
 _BINARY_OPERATORS = {
@@ -1570,7 +1573,7 @@ NON_FACTUAL_CUES = (
 )
 
 
-def analyze_question(text: str) -> dict[str, Any]:
+def _analyze_question_rules(text: str) -> dict[str, Any]:
     """Deterministic question router for tool selection and confidence handling."""
     normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
     if not normalized:
@@ -1612,6 +1615,36 @@ def analyze_question(text: str) -> dict[str, Any]:
 
     return {"kind": "general_request", "needs_reference": False, "needs_live_data": False}
 
+
+
+def analyze_question(
+    text: str,
+    memories: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Combine deterministic safety/rule routing with a locally trained intent model."""
+    assessment = _analyze_question_rules(text)
+    prediction = train_default_classifier(memories).predict(text)
+    assessment["model_intent"] = prediction["label"]
+    assessment["model_confidence"] = round(float(prediction["confidence"]), 4)
+    assessment["model_margin"] = round(float(prediction["margin"]), 4)
+    # Learned classification only helps resolve vague questions. Explicit rules
+    # above always retain priority for privacy, arithmetic, and current data.
+    confidence = float(prediction["confidence"])
+    margin = float(prediction["margin"])
+    learned_intent = str(prediction["label"])
+    if (
+        assessment["kind"] == "general_request"
+        and confidence >= 0.30
+        and margin >= 0.05
+    ):
+        assessment["intent_hint"] = learned_intent
+        if learned_intent == "current_information":
+            assessment["kind"] = "current_information"
+            assessment["needs_live_data"] = True
+        elif learned_intent == "factual_question":
+            assessment["kind"] = "factual_question"
+            assessment["needs_reference"] = True
+    return assessment
 
 
 def select_relevant_references(
@@ -1658,7 +1691,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "0.9.0"
+    version = "1.0.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -1686,6 +1719,10 @@ class LocalAIEngine:
             "速さ・距離・時間の文章題",
             "オームの法則と密度の文章題",
             "組合せ・順列と基本確率の計算",
+            "連立一次方程式の消去法による解法",
+            "最大公約数・最小公倍数・素因数分解",
+            "化学式の構成元素とモル質量の計算",
+            "ローカル学習データで訓練する質問分類器",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
 
@@ -1702,6 +1739,10 @@ class LocalAIEngine:
             {"name": "density_solver", "description": "質量・体積・密度の関係を計算"},
             {"name": "combinatorics_solver", "description": "組合せ・順列を計算"},
             {"name": "probability_solver", "description": "公平なサイコロ・コインの基本確率"},
+            {"name": "linear_system_solver", "description": "xとyの連立一次方程式を解いて検算"},
+            {"name": "number_theory", "description": "最大公約数・最小公倍数・素因数分解"},
+            {"name": "chemistry_formula", "description": "対応元素の化学式とモル質量を計算"},
+            {"name": "trainable_intent_classifier", "description": "ローカル例と長期記憶の学習例で質問分類"},
             {"name": "unit_converter", "description": "長さ・重さ・容量の単位変換。計算式にも対応"},
             {"name": "japan_clock", "description": "日本時間の日付と時刻"},
             {"name": "memory_search", "description": "保存済みの記憶をキーワード検索"},
@@ -1738,6 +1779,10 @@ class LocalAIEngine:
             "density_solver": True,
             "combinatorics_solver": True,
             "probability_solver": True,
+            "linear_system_solver": True,
+            "number_theory": True,
+            "chemistry_formula": True,
+            "trainable_intent_classifier": True,
             "capabilities": len(self.capabilities()),
             "tools": len(self.tools()),
         }
@@ -1811,6 +1856,33 @@ class LocalAIEngine:
             return {
                 "answer": f"日本時間は {now:%Y年%m月%d日 %H:%M} です。",
                 "plan": [], "intent": "datetime", "tools_used": ["japan_clock"],
+            }
+
+        linear_system_answer = solve_linear_system(text)
+        if linear_system_answer:
+            return {
+                "answer": linear_system_answer,
+                "plan": [],
+                "intent": "linear_system_solving",
+                "tools_used": ["linear_system_solver", "self_check"],
+            }
+
+        number_theory_answer = solve_number_theory(text)
+        if number_theory_answer:
+            return {
+                "answer": number_theory_answer,
+                "plan": [],
+                "intent": "number_theory",
+                "tools_used": ["number_theory", "self_check"],
+            }
+
+        molar_mass_answer = solve_molar_mass(text)
+        if molar_mass_answer:
+            return {
+                "answer": molar_mass_answer,
+                "plan": [],
+                "intent": "chemistry_calculation",
+                "tools_used": ["chemistry_formula", "self_check"],
             }
 
         equation_answer = solve_equation(text)
@@ -1976,7 +2048,7 @@ class LocalAIEngine:
                 "plan": [], "intent": "memory_context", "tools_used": ["memory_search"],
             }
 
-        assessment = analyze_question(text)
+        assessment = analyze_question(text, memories)
         if assessment["needs_reference"]:
             retrieved = search_wikipedia(text)
             references = select_relevant_references(text, retrieved)
