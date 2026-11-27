@@ -734,10 +734,10 @@ def test_v10_analyzer_uses_user_learning_examples():
 def test_v10_runtime_learned_planning_route():
     memories = [{
         "category": "AI学習例",
-        "content": "計画 | この特別な依頼を計画タスクとして処理する",
+        "content": "計画 | この特殊な依頼をタスク群Aとして整理して",
     }]
     result = LocalAIEngine().reply(
-        "この特別な依頼を計画タスクとして処理する",
+        "この特殊な依頼をタスク群Aとして整理して",
         memories=memories,
         sovereign_mode=False,
     )
