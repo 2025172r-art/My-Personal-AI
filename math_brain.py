@@ -69,6 +69,7 @@ def _normalise_linear_equation(equation: str) -> tuple[float, float, float]:
 def solve_linear_system(request: str) -> str | None:
     """Solve two simultaneous linear equations in x and y."""
     text = (request or "").strip()
+    text = re.sub(r"^(?:連立一次方程式|連立方程式|連立)\s*", "", text)
     if not re.search(r"[xy]", text, re.IGNORECASE):
         return None
     if any(word in text for word in ("連立方程式", "連立", "xとy", "x、y")):
@@ -76,7 +77,7 @@ def solve_linear_system(request: str) -> str | None:
     elif text.count("=") < 2:
         return None
 
-    equations = [part.strip() for part in re.split(r"[;\n、]+", text) if "=" in part]
+    equations = [part.strip() for part in re.split(r"[,;\n、]+", text) if "=" in part]
     if len(equations) != 2:
         return None
     try:
