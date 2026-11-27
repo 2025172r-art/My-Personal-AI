@@ -1287,7 +1287,8 @@ def _search_memories(query: str, memories: list[dict[str, Any]], limit: int = 5)
     query_tokens = _tokens(query)
     ranked = []
     for item in memories:
-        if item.get("category") in {"タスク", "完了タスク"}:
+        if item.get("category") in {"タスク", "完了タスク", "AI学習例"}:
+            # Training examples feed the classifier, not conversational memory recall.
             continue
         content = f"{item.get('category', '')} {item.get('content', '')}"
         overlap = len(query_tokens & _tokens(content))
