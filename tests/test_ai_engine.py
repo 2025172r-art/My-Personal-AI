@@ -50,7 +50,7 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "0.9.0"
+    assert engine.health()["version"] == "1.0.0"
     assert engine.health()["equation_solver"] is True
     assert engine.health()["statistics_engine"] is True
     assert engine.health()["percentage_solver"] is True
@@ -629,7 +629,7 @@ def test_context_graph_handles_api_followup():
 
 def test_all_v09_tools_are_advertised_in_health():
     health = LocalAIEngine().health()
-    assert health["version"] == "0.9.0"
+    assert health["version"] == "1.0.0"
     assert health["combinatorics_solver"] is True
     assert health["probability_solver"] is True
     assert health["ohms_law_solver"] is True
