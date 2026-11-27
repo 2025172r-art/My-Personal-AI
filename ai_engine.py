@@ -1722,7 +1722,8 @@ class LocalAIEngine:
             "連立一次方程式の消去法による解法",
             "最大公約数・最小公倍数・素因数分解",
             "化学式の構成元素とモル質量の計算",
-            "ローカル学習データで訓練する質問分類器",
+            "ローカル学習データで訓練する質問分類器（長期記憶の学習例に対応）",
+            "連立方程式・数論・化学式の専用推論",
             "理科・数学・プログラミングの基礎知識を拡張",
         ]
 
@@ -2049,6 +2050,47 @@ class LocalAIEngine:
             }
 
         assessment = analyze_question(text, memories)
+        intent_hint = assessment.get("intent_hint")
+        intent_confidence = float(assessment.get("model_confidence", 0.0))
+        if intent_hint == "planning" and intent_confidence >= 0.32:
+            return {
+                "answer": "質問分類モデルが計画依頼と判断しました。次の順序で進めます。",
+                "plan": _plan_for(text),
+                "intent": "learned_planning",
+                "tools_used": ["trainable_intent_classifier", "task_planner"],
+                "model_confidence": intent_confidence,
+            }
+        if intent_hint == "coding" and intent_confidence >= 0.36:
+            return {
+                "answer": (
+                    "質問分類モデルがプログラミング依頼と判断しました。"
+                    "このエンジンは任意のコードを自動実行しませんが、実装作業を安全な段階に分けられます。"
+                ),
+                "plan": [
+                    "目的・入力・出力・実行環境を整理する",
+                    "処理を小さな関数やモジュールに分ける",
+                    "通常入力・境界値・異常入力のテストを作る",
+                    "コードを実行せずに内容と安全性を確認する",
+                ],
+                "intent": "learned_coding_plan",
+                "tools_used": ["trainable_intent_classifier", "task_planner"],
+                "model_confidence": intent_confidence,
+            }
+        if intent_hint == "summarization":
+            if document_context.strip():
+                return {
+                    "answer": "読み込まれた資料の抽出的な要約です。\n" + _sentence_summary(document_context),
+                    "plan": [],
+                    "intent": "learned_summarization",
+                    "tools_used": ["trainable_intent_classifier", "extractive_summary"],
+                }
+            return {
+                "answer": "要約する資料がまだありません。ファイルを読み込むか、文章をチャットに貼り付けてください。",
+                "plan": [],
+                "intent": "summarization_needs_source",
+                "tools_used": ["trainable_intent_classifier"],
+            }
+
         if assessment["needs_reference"]:
             retrieved = search_wikipedia(text)
             references = select_relevant_references(text, retrieved)
