@@ -78,9 +78,9 @@ Python + Streamlit + Supabase で動く個人用AIエージェントです。チ
 
 ## Wikipedia知識の取り込み
 
-「Wikipedia知識」タブから基礎記事20件をまとめて読み込めます。その後、内蔵知識で答えられない事実質問では関連記事を最大3件取得し、Supabaseの `wiki_knowledge` テーブルに保存します。次回以降は保存済み記事を先に検索します。保存内容は日本語Wikipediaの記事本文の抜粋（通常最大12,000文字）とページID・改訂ID・出典URL・取得日時・ライセンス情報です。全文百科事典のミラーではありません。Wikipedia記事はCC BY-SA 4.0で出典を表示します。API利用ではUser-Agentを識別し、maxlagと逐次取得を使用します。
+初回起動時に知識ベースが空なら、基礎記事20件を自動で一括取得します。「Wikipedia知識」タブから再試行・追加取り込みもできます。その後、内蔵知識で答えられない事実質問では関連記事を最大3件取得し、Supabaseの `wiki_knowledge` テーブルに保存します。次回以降は保存済み記事を先に検索します。保存内容は日本語Wikipediaの記事本文の抜粋（通常最大12,000文字）とページID・改訂ID・出典URL・取得日時・ライセンス情報です。全文百科事典のミラーではありません。Wikipedia記事はCC BY-SA 4.0で出典を表示します。API利用ではUser-Agentを識別し、maxlagと逐次取得を使用します。
 
-Supabaseの追加スキーマは `supabase/migrations/0002_wikipedia_knowledge.sql` です。Edge Functionの `upsert_wikipedia_pages`、`search_wikipedia_pages`、`get_wikipedia_stats` アクションを使用します。
+初回の自動取り込みが失敗した場合は「Wikipedia知識」タブから再試行できます。Supabaseの追加スキーマは `supabase/migrations/0002_wikipedia_knowledge.sql` です。Edge Functionの `upsert_wikipedia_pages`、`search_wikipedia_pages`、`get_wikipedia_stats` アクションを使用します。
 
 ## 重要な制約
 
