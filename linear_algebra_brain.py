@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ast
 import math
+import re
 from fractions import Fraction
 from typing import Any
 
