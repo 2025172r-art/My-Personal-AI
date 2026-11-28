@@ -343,14 +343,7 @@ def solve_linear_algebra(request: str) -> str | None:
                 magnitude = math.sqrt(float(squared))
                 return f"**ベクトルの大きさ**\n|a| = √({_fmt(squared)}) ≈ {magnitude:.8g}"
         return None
-    except (ValueError, TypeError, ZeroDivisionError, OverflowError, SyntaxError):
-        # A malformed or unsupported literal must not crash the whole chat.
-        try:
-            # Re-run only the relevant validation to provide a useful bounded error.
-            if all(isinstance(item, list) and item and isinstance(item[0], list) for item in arrays):
-                _as_matrix(arrays[0])
-            elif arrays:
-                _as_vector(arrays[0])
-        except (ValueError, TypeError):
-            raise
+    except ValueError as exc:
+        return str(exc)
+    except (TypeError, ZeroDivisionError, OverflowError, SyntaxError):
         return "この行列・ベクトルの入力は対応範囲外です。1〜4次元の数値配列を使ってください。"
