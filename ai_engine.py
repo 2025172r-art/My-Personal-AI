@@ -1468,8 +1468,8 @@ def _clean_reference_query(query: str) -> str:
     return cleaned.strip(" ?？。！!、")[:120]
 
 
-def search_wikipedia(query: str, max_results: int = 3) -> list[dict[str, str]]:
-    """Return short, cited extracts from Japanese Wikipedia, then English as fallback.
+def search_wikipedia(query: str, max_results: int = 3) -> list[dict[str, Any]]:
+    """Return bounded, cited article text from Japanese Wikipedia, then English as fallback.
 
     This is reference retrieval, not a generative AI model. Retrieved text is
     treated as untrusted reference material and is never executed as instructions.
