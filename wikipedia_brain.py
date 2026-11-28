@@ -120,7 +120,12 @@ def wikipedia_search_terms(query: str, max_terms: int = 24) -> list[str]:
         "説明", "何ですか", "please", "what", "when", "where", "how",
         "does", "this", "that", "with", "from", "about",
     }
-    for piece in re.findall(r"[a-z0-9][a-z0-9_-]*|[ぁ-んァ-ン一-龥]+", (query or "").lower()):
+    cleaned_query = re.sub(
+        r"(とは何ですか|とは何|とは|って何ですか|って何|について教えてください|について教えて|を教えてください|を教えて)$",
+        "",
+        (query or "").lower().strip(" ？?。！!"),
+    )
+    for piece in re.findall(r"[a-z0-9][a-z0-9_-]*|[ぁ-んァ-ン一-龥]+", cleaned_query):
         if piece in stop_words or len(piece) < 2:
             continue
         if re.fullmatch(r"[a-z0-9][a-z0-9_-]*", piece):
