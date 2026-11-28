@@ -151,6 +151,7 @@ with chat_tab:
                 new_sources = result.get("sources", [])
                 if new_sources:
                     store.upsert_wikipedia_pages(new_sources)
+                st.session_state.pop("wiki_last_save_error", None)
             except Exception as wiki_exc:
                 st.session_state["wiki_last_save_error"] = str(wiki_exc)
             answer = result["answer"]
@@ -308,6 +309,8 @@ with wiki_tab:
                     st.error("Wikipediaから記事を取得できませんでした。少し時間をおいて再試行してください。")
                 else:
                     saved_count = store.upsert_wikipedia_pages(pages)
+                    st.session_state.pop("wiki_bootstrap_error", None)
+                    st.session_state["wiki_bootstrap_saved_count"] = saved_count
                     st.success(f"{saved_count}件の記事を知識ベースに保存しました。")
                     st.rerun()
         except Exception as exc:
