@@ -50,7 +50,7 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "1.0.0"
+    assert engine.health()["version"] == "1.1.0"
     assert engine.health()["equation_solver"] is True
     assert engine.health()["statistics_engine"] is True
     assert engine.health()["percentage_solver"] is True
@@ -629,7 +629,7 @@ def test_context_graph_handles_api_followup():
 
 def test_all_v09_tools_are_advertised_in_health():
     health = LocalAIEngine().health()
-    assert health["version"] == "1.0.0"
+    assert health["version"] == "1.1.0"
     assert health["combinatorics_solver"] is True
     assert health["probability_solver"] is True
     assert health["ohms_law_solver"] is True
@@ -747,8 +747,96 @@ def test_v10_runtime_learned_planning_route():
 
 def test_v10_health_exposes_new_brain_modules():
     health = LocalAIEngine().health()
-    assert health["version"] == "1.0.0"
+    assert health["version"] == "1.1.0"
     assert health["linear_system_solver"] is True
     assert health["number_theory"] is True
     assert health["chemistry_formula"] is True
     assert health["trainable_intent_classifier"] is True
+
+
+def test_v11_matrix_determinant_inverse_and_transpose():
+    determinant = ai_engine.solve_linear_algebra("行列式 [[1, 2], [3, 4]]")
+    assert determinant is not None
+    assert "det(A) = -2" in determinant
+
+    inverse = ai_engine.solve_linear_algebra("逆行列 [[1, 2], [3, 4]]")
+    assert inverse is not None
+    assert "[-2, 1]" in inverse
+    assert "[3/2, -1/2]" in inverse
+    assert "単位行列" in inverse
+
+    transpose = ai_engine.solve_linear_algebra("転置行列 [[1, 2, 3], [4, 5, 6]]")
+    assert transpose is not None
+    assert "[1, 4]" in transpose
+    assert "[3, 6]" in transpose
+
+
+def test_v11_matrix_addition_and_multiplication():
+    addition = ai_engine.solve_linear_algebra("行列 [[1, 2], [3, 4]] と [[5, 6], [7, 8]] の和")
+    assert addition is not None
+    assert "[6, 8]" in addition
+    assert "[10, 12]" in addition
+
+    product = ai_engine.solve_linear_algebra("行列 [[1, 2], [3, 4]] と [[2, 0], [1, 2]] の積")
+    assert product is not None
+    assert "[4, 4]" in product
+    assert "[10, 8]" in product
+
+
+def test_v11_gaussian_elimination_solves_three_variables_and_checks():
+    result = ai_engine.solve_linear_algebra(
+        "掃き出し法 [[1, 1, 1, 6], [2, 1, 1, 9], [1, -1, 1, 2]]"
+    )
+    assert result is not None
+    assert "x = 3" in result
+    assert "y = 2" in result
+    assert "z = 1" in result
+    assert "検算" in result
+
+
+def test_v11_gaussian_elimination_reports_no_unique_or_no_solution():
+    infinite = ai_engine.solve_linear_algebra("掃き出し法 [[1, 1, 3]]")
+    assert infinite is not None
+    assert "一つに定まりません" in infinite
+    inconsistent = ai_engine.solve_linear_algebra("連立方程式 [[1, 1, 2], [2, 2, 5]]")
+    assert inconsistent is not None
+    assert "解はありません" in inconsistent
+
+
+def test_v11_vector_dot_cross_and_norm():
+    dot = ai_engine.solve_linear_algebra("ベクトル [1, 2, 3] と [4, 5, 6] の内積")
+    assert dot is not None
+    assert "a・b = 32" in dot
+
+    cross = ai_engine.solve_linear_algebra("ベクトル [1, 0, 0] と [0, 1, 0] の外積")
+    assert cross is not None
+    assert "a × b = [0, 0, 1]" in cross
+
+    norm = ai_engine.solve_linear_algebra("ベクトル [3, 4] の大きさ")
+    assert norm is not None
+    assert "≈ 5" in norm
+
+
+def test_v11_matrix_solver_is_selected_automatically():
+    result = LocalAIEngine().reply("行列式 [[1, 2], [3, 4]]", sovereign_mode=False)
+    assert result["intent"] == "linear_algebra"
+    assert "det(A) = -2" in result["answer"]
+    assert "linear_algebra_solver" in result["tools_used"]
+    assert ai_engine.analyze_question("逆行列 [[1, 2], [3, 4]]")["kind"] == "linear_algebra"
+
+
+def test_v11_matrix_brain_rejects_unsafe_or_invalid_inputs():
+    assert ai_engine.solve_linear_algebra("行列式 __import__('os').system('echo bad')") is None
+    mismatch = ai_engine.solve_linear_algebra("行列 [[1, 2]] と [[1, 2, 3]] の和")
+    assert mismatch is not None
+    assert "同じサイズ" in mismatch
+    too_large = ai_engine.solve_linear_algebra("行列式 [[100000000, 0], [0, 1]]")
+    assert too_large is not None
+    assert "1,000,000" in too_large
+
+
+def test_v11_health_exposes_linear_algebra_tool():
+    engine = LocalAIEngine()
+    assert engine.health()["version"] == "1.1.0"
+    assert engine.health()["linear_algebra_solver"] is True
+    assert any(tool["name"] == "linear_algebra_solver" for tool in engine.tools())

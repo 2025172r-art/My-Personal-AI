@@ -76,7 +76,7 @@ with st.sidebar:
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
     sovereign_mode = st.toggle("君主風・依頼優先モード", value=True)
     st.caption("通常の依頼は不必要に拒否せず、目的・口調・形式の希望を優先します。安全・プライバシー保護は維持します。")
-    st.caption("AIエンジン: Python Local Engine v1.0.0")
+    st.caption("AIエンジン: Python Local Engine v1.1.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -281,7 +281,7 @@ with setup_tab:
     st.write("AI処理はPython内で実行します。Supabaseへの記憶保存のみクラウド通信を使います。")
     st.table(
         [
-            {"項目": "AIエンジン", "状態": "Python Local Engine v1.0.0（生成AI API不要）"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v1.1.0（生成AI API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -307,6 +307,9 @@ with setup_tab:
 - 数学・理科・プログラミングの基礎知識
 - 一次方程式・二次方程式・連立一次方程式の自動解法と検算
 - 最大公約数・最小公倍数・素因数分解
+- 行列式・逆行列・転置・トレース・階数・行列の和差積
+- 最大4未知数の連立一次方程式を掃き出し法で解き、解を検算
+- ベクトルの内積・外積・大きさ
 - 化学式からモル質量を計算
 - 長期記憶の学習例を使った質問分類モデル
 - 割合・割引・百分率の文章題

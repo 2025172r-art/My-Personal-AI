@@ -15,6 +15,7 @@ import requests
 
 from learning_brain import train_default_classifier
 from math_brain import solve_linear_system, solve_molar_mass, solve_number_theory
+from linear_algebra_brain import solve_linear_algebra
 
 # Safety boundary: the engine never evaluates arbitrary Python or executes
 # instructions found inside uploaded documents, memories, or retrieved text.
@@ -1580,6 +1581,8 @@ def _analyze_question_rules(text: str) -> dict[str, Any]:
     if not normalized:
         return {"kind": "empty", "needs_reference": False, "needs_live_data": False}
 
+    if "[" in normalized and any(cue in normalized for cue in ("行列", "ベクトル", "掃き出し法", "内積", "外積", "逆行列", "行列式", "transpose", "determinant")):
+        return {"kind": "linear_algebra", "needs_reference": False, "needs_live_data": False}
     if _find_calculation(normalized):
         return {"kind": "calculation", "needs_reference": False, "needs_live_data": False}
     if re.search(r"\d+\s*[cC]\s*\d+", normalized) or "個から" in normalized and "選ぶ" in normalized:
@@ -1692,7 +1695,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "1.0.0"
+    version = "1.1.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -1721,6 +1724,9 @@ class LocalAIEngine:
             "オームの法則と密度の文章題",
             "組合せ・順列と基本確率の計算",
             "連立一次方程式の消去法による解法",
+            "行列式・逆行列・転置・行列積・階数の計算",
+            "掃き出し法で最大4未知数の連立一次方程式を解き、解を検算",
+            "ベクトルの内積・外積・大きさの計算",
             "最大公約数・最小公倍数・素因数分解",
             "化学式の構成元素とモル質量の計算",
             "ローカル学習データで訓練する質問分類器（長期記憶の学習例に対応）",
@@ -1742,6 +1748,7 @@ class LocalAIEngine:
             {"name": "combinatorics_solver", "description": "組合せ・順列を計算"},
             {"name": "probability_solver", "description": "公平なサイコロ・コインの基本確率"},
             {"name": "linear_system_solver", "description": "xとyの連立一次方程式を解いて検算"},
+            {"name": "linear_algebra_solver", "description": "行列・ベクトル計算と最大4未知数の掃き出し法"},
             {"name": "number_theory", "description": "最大公約数・最小公倍数・素因数分解"},
             {"name": "chemistry_formula", "description": "対応元素の化学式とモル質量を計算"},
             {"name": "trainable_intent_classifier", "description": "ローカル例と長期記憶の学習例で質問分類"},
@@ -1782,6 +1789,7 @@ class LocalAIEngine:
             "combinatorics_solver": True,
             "probability_solver": True,
             "linear_system_solver": True,
+            "linear_algebra_solver": True,
             "number_theory": True,
             "chemistry_formula": True,
             "trainable_intent_classifier": True,
@@ -1858,6 +1866,15 @@ class LocalAIEngine:
             return {
                 "answer": f"日本時間は {now:%Y年%m月%d日 %H:%M} です。",
                 "plan": [], "intent": "datetime", "tools_used": ["japan_clock"],
+            }
+
+        linear_algebra_answer = solve_linear_algebra(text)
+        if linear_algebra_answer:
+            return {
+                "answer": linear_algebra_answer,
+                "plan": [],
+                "intent": "linear_algebra",
+                "tools_used": ["linear_algebra_solver", "self_check"],
             }
 
         linear_system_answer = solve_linear_system(text)
