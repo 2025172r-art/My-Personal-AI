@@ -1699,9 +1699,12 @@ def _format_reference_answer(query: str, references: list[dict[str, str]]) -> st
     ]
     for item in references[:2]:
         summary = _sentence_summary(item.get("extract", ""), max_sentences=3)
+        license_url = item.get("license_url") or "https://creativecommons.org/licenses/by-sa/4.0/"
+        license_name = item.get("license") or "CC BY-SA 4.0"
         lines.append(
             f"**{item.get('title', '参考資料')}**\n{summary}\n"
-            f"出典: [{item.get('title', '記事を開く')}]({item.get('url', '')})"
+            f"出典: [{item.get('title', '記事を開く')}]({item.get('url', '')}) "
+            f"（Wikipedia、[{license_name}]({license_url})）"
         )
     return "\n\n".join(lines)
 
