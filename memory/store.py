@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -10,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from config import get_setting
+from wikipedia_brain import wikipedia_search_terms
 
 
 class MemoryStore:
@@ -77,8 +79,27 @@ class MemoryStore:
                 )"""
             )
             con.execute(
+                """CREATE TABLE IF NOT EXISTS wiki_knowledge (
+                    language TEXT NOT NULL,
+                    page_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    article_text TEXT NOT NULL,
+                    revision_id INTEGER,
+                    source_updated_at TEXT,
+                    license TEXT NOT NULL,
+                    license_url TEXT NOT NULL,
+                    fetched_at TEXT NOT NULL,
+                    PRIMARY KEY (language, page_id)
+                )"""
+            )
+            con.execute(
                 "CREATE INDEX IF NOT EXISTS idx_chat_session_created "
                 "ON chat_messages(session_id, created_at)"
+            )
+            con.execute(
+                "CREATE INDEX IF NOT EXISTS idx_wiki_title "
+                "ON wiki_knowledge(language, title)"
             )
 
     @staticmethod
@@ -212,3 +233,153 @@ class MemoryStore:
         else:
             with self._connect() as con:
                 con.execute("DELETE FROM memories WHERE id=?", (memory_id,))
+
+    @staticmethod
+    def _normalise_wikipedia_pages(pages: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+        """Validate and bound Wiki content before it reaches persistent storage."""
+        normalised: list[dict[str, Any]] = []
+        for page in pages or []:
+            if not isinstance(page, dict):
+                continue
+            language = str(page.get("language", "ja")).strip().lower()
+            try:
+                page_id = int(page.get("page_id", page.get("pageid", 0)))
+            except (TypeError, ValueError):
+                continue
+            title = re.sub(r"\s+", " ", str(page.get("title", "")).strip())[:300]
+            url = str(page.get("url", "")).strip()
+            article_text = str(page.get("article_text") or page.get("extract") or "").strip()[:18000]
+            if language not in {"ja", "en"} or page_id <= 0 or not title or not article_text:
+                continue
+            if not (url.startswith(f"https://{language}.wikipedia.org/")):
+                continue
+            try:
+                revision_id = int(page["revision_id"]) if page.get("revision_id") else None
+            except (TypeError, ValueError):
+                revision_id = None
+            normalised.append({
+                "language": language,
+                "page_id": page_id,
+                "title": title,
+                "url": url,
+                "article_text": article_text,
+                "revision_id": revision_id,
+                "source_updated_at": page.get("source_updated_at") or None,
+                "license": str(page.get("license") or "CC BY-SA 4.0")[:80],
+                "license_url": str(
+                    page.get("license_url")
+                    or "https://creativecommons.org/licenses/by-sa/4.0/"
+                )[:300],
+            })
+            if len(normalised) >= 25:
+                break
+        return normalised
+
+    def upsert_wikipedia_pages(self, pages: list[dict[str, Any]] | None) -> int:
+        """Store multiple attributed Wikipedia pages in one database operation."""
+        rows = self._normalise_wikipedia_pages(pages)
+        if not rows:
+            return 0
+        if self.memory_api_url:
+            result = self._edge("upsert_wikipedia_pages", pages=rows)
+            return int(result.get("saved", len(rows)))
+        if self.client:
+            response = (
+                self.client.table("wiki_knowledge")
+                .upsert(rows, on_conflict="language,page_id")
+                .execute()
+            )
+            return len(response.data or rows)
+        now = self._now()
+        with self._connect() as con:
+            con.executemany(
+                """INSERT INTO wiki_knowledge
+                (language,page_id,title,url,article_text,revision_id,source_updated_at,
+                 license,license_url,fetched_at)
+                VALUES (:language,:page_id,:title,:url,:article_text,:revision_id,
+                        :source_updated_at,:license,:license_url,:fetched_at)
+                ON CONFLICT(language,page_id) DO UPDATE SET
+                    title=excluded.title,
+                    url=excluded.url,
+                    article_text=excluded.article_text,
+                    revision_id=excluded.revision_id,
+                    source_updated_at=excluded.source_updated_at,
+                    license=excluded.license,
+                    license_url=excluded.license_url,
+                    fetched_at=excluded.fetched_at""",
+                [{**row, "fetched_at": now} for row in rows],
+            )
+        return len(rows)
+
+    def search_wikipedia_pages(
+        self,
+        query: str,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Find cached Wiki pages relevant to the current question."""
+        terms = wikipedia_search_terms(query)
+        if not terms:
+            return []
+        bounded_limit = max(1, min(int(limit), 10))
+        if self.memory_api_url:
+            data = self._edge(
+                "search_wikipedia_pages",
+                search_terms=terms,
+                limit=bounded_limit,
+            ).get("data", [])
+        elif self.client:
+            response = self.client.rpc(
+                "search_wikipedia_knowledge",
+                {"search_terms": terms, "result_limit": bounded_limit},
+            ).execute()
+            data = response.data or []
+        else:
+            with self._connect() as con:
+                rows = con.execute("SELECT * FROM wiki_knowledge").fetchall()
+            ranked: list[tuple[int, int, dict[str, Any]]] = []
+            for row in rows:
+                item = dict(row)
+                title = str(item.get("title", "")).casefold()
+                body = str(item.get("article_text", "")).casefold()
+                title_score = sum(term.casefold() in title for term in terms)
+                body_score = sum(term.casefold() in body for term in terms)
+                if title_score + body_score:
+                    ranked.append((title_score, body_score, item))
+            ranked.sort(key=lambda item: (-item[0], -item[1], item[2].get("fetched_at", "")))
+            data = [item[2] for item in ranked[:bounded_limit]]
+
+        results: list[dict[str, Any]] = []
+        for item in data or []:
+            page = dict(item)
+            page["extract"] = page.get("article_text") or page.get("extract", "")
+            results.append(page)
+        return results
+
+    def get_wikipedia_stats(self) -> dict[str, Any]:
+        """Return the number of cached articles and the most recent ingestion time."""
+        if self.memory_api_url:
+            return self._edge("get_wikipedia_stats")
+        if self.client:
+            response = (
+                self.client.table("wiki_knowledge")
+                .select("page_id", count="exact")
+                .limit(1)
+                .execute()
+            )
+            latest = (
+                self.client.table("wiki_knowledge")
+                .select("fetched_at")
+                .order("fetched_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            return {
+                "count": int(response.count or 0),
+                "latest_fetched_at": (latest.data or [{}])[0].get("fetched_at"),
+            }
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT COUNT(*) AS count, MAX(fetched_at) AS latest_fetched_at FROM wiki_knowledge"
+            ).fetchone()
+        return {"count": int(row["count"]), "latest_fetched_at": row["latest_fetched_at"]}
+
