@@ -10,6 +10,7 @@ from agent import run_agent_task
 from config import get_setting
 from memory.store import MemoryStore
 from tools.file_reader import extract_uploaded_file
+from wikipedia_brain import CORE_ARTICLE_TITLES, fetch_core_wikipedia_articles
 
 st.set_page_config(
     page_title="My Personal AI",
@@ -56,6 +57,21 @@ if not authenticate():
 # ローカルAIエンジンは外部の生成AI APIキーを必要としません。
 store = MemoryStore.from_settings()
 
+# Seed the persistent Wiki cache once when the database is empty.
+# This avoids asking the owner to import articles one by one.
+if not st.session_state.get("wiki_bootstrap_checked", False):
+    st.session_state["wiki_bootstrap_checked"] = True
+    try:
+        if int(store.get_wikipedia_stats().get("count", 0)) == 0:
+            with st.spinner("初期Wikipedia知識20記事をまとめて取り込んでいます…"):
+                starter_pages = fetch_core_wikipedia_articles()
+                if starter_pages:
+                    st.session_state["wiki_bootstrap_saved_count"] = store.upsert_wikipedia_pages(starter_pages)
+                else:
+                    st.session_state["wiki_bootstrap_error"] = "初期記事を取得できませんでした。Wikipedia知識タブから再試行できます。"
+    except Exception as bootstrap_exc:
+        st.session_state["wiki_bootstrap_error"] = str(bootstrap_exc)
+
 # Single-owner ID: chat history remains available after reloads and on other devices.
 if "session_id" not in st.session_state:
     st.session_state.session_id = "personal-owner-default"
@@ -76,7 +92,7 @@ with st.sidebar:
     speak_answers = st.toggle("回答を音声で読み上げる", value=False)
     sovereign_mode = st.toggle("君主風・依頼優先モード", value=True)
     st.caption("通常の依頼は不必要に拒否せず、目的・口調・形式の希望を優先します。安全・プライバシー保護は維持します。")
-    st.caption("AIエンジン: Python Local Engine v1.1.0")
+    st.caption("AIエンジン: Python Local Engine v1.2.0")
     st.caption(f"記憶保存先: {store.backend_name}")
     if store.backend_name == "SQLite（ローカル試作用）":
         st.warning("クラウド公開後はSupabaseを設定してください。")
@@ -87,8 +103,8 @@ with st.sidebar:
 st.title("My Personal AI")
 st.caption("会話・計算・長期記憶・ファイル分析・作業計画・音声読み上げ")
 
-chat_tab, files_tab, memory_tab, tasks_tab, setup_tab = st.tabs(
-    ["💬 チャット", "📎 ファイル", "🧠 長期記憶", "✅ タスク", "⚙️ 接続状態"]
+chat_tab, files_tab, memory_tab, wiki_tab, tasks_tab, setup_tab = st.tabs(
+    ["💬 チャット", "📎 ファイル", "🧠 長期記憶", "📚 Wikipedia知識", "✅ タスク", "⚙️ 接続状態"]
 )
 
 with chat_tab:
@@ -114,7 +130,11 @@ with chat_tab:
             store.add_message(st.session_state.session_id, "user", prompt.strip())
             memories = store.get_memories(limit=100)
             history = store.get_messages(st.session_state.session_id, limit=12)
-            with st.spinner("AIエージェントが考えています…"):
+            try:
+                cached_wiki = store.search_wikipedia_pages(prompt.strip(), limit=5)
+            except Exception:
+                cached_wiki = []
+            with st.spinner("保存済み知識とWikipediaの記事を照合しています…"):
                 result = run_agent_task(
                     client=None,
                     user_request=prompt.strip(),
@@ -124,7 +144,16 @@ with chat_tab:
                     use_web_search=False,
                     use_multi_agent=False,
                     sovereign_mode=sovereign_mode,
+                    wiki_knowledge=cached_wiki,
                 )
+            # Newly retrieved sources are added to the persistent knowledge base.
+            try:
+                new_sources = result.get("sources", [])
+                if new_sources:
+                    store.upsert_wikipedia_pages(new_sources)
+                st.session_state.pop("wiki_last_save_error", None)
+            except Exception as wiki_exc:
+                st.session_state["wiki_last_save_error"] = str(wiki_exc)
             answer = result["answer"]
             store.add_message(st.session_state.session_id, "assistant", answer)
             st.session_state.latest_answer = answer
@@ -250,6 +279,54 @@ with memory_tab:
     except Exception as exc:
         st.error(f"記憶を読み込めませんでした: {exc}")
 
+with wiki_tab:
+    st.subheader("Wikipedia知識ベース")
+    st.write(
+        "記事を一つずつ登録する必要はありません。基礎記事をまとめて取り込み、"
+        "その後は質問に関係する記事を自動取得して保存し、次回以降の回答で再利用します。"
+    )
+    st.caption(
+        f"初期セットは数学・科学・情報・歴史・地理・社会・文化など {len(CORE_ARTICLE_TITLES)} 分野の記事です。"
+        "保存するのは記事本文の抜粋と出典情報です。"
+    )
+    try:
+        wiki_stats = store.get_wikipedia_stats()
+        stat_col1, stat_col2 = st.columns(2)
+        stat_col1.metric("保存済み記事", int(wiki_stats.get("count", 0)))
+        stat_col2.metric(
+            "最終取り込み",
+            str(wiki_stats.get("latest_fetched_at") or "まだありません")[:19].replace("T", " "),
+        )
+    except Exception as exc:
+        st.error(f"Wikipedia知識ベースに接続できませんでした: {exc}")
+        wiki_stats = {"count": 0}
+
+    if st.button("📥 基礎Wikipedia記事をまとめて取り込む", type="primary", use_container_width=True):
+        try:
+            with st.spinner("Wikipediaから基礎記事をまとめて読み込んでいます…"):
+                pages = fetch_core_wikipedia_articles()
+                if not pages:
+                    st.error("Wikipediaから記事を取得できませんでした。少し時間をおいて再試行してください。")
+                else:
+                    saved_count = store.upsert_wikipedia_pages(pages)
+                    st.session_state.pop("wiki_bootstrap_error", None)
+                    st.session_state["wiki_bootstrap_saved_count"] = saved_count
+                    st.success(f"{saved_count}件の記事を知識ベースに保存しました。")
+                    st.rerun()
+        except Exception as exc:
+            st.error(f"一括取り込みに失敗しました: {exc}")
+
+    if st.session_state.get("wiki_bootstrap_saved_count"):
+        st.success(f"初回セットとして{st.session_state['wiki_bootstrap_saved_count']}件の記事を自動取り込みしました。")
+    if st.session_state.get("wiki_bootstrap_error"):
+        st.warning("初回の自動取り込みに失敗しました。下のボタンで再試行できます。")
+    if st.session_state.get("wiki_last_save_error"):
+        st.warning("新しいWikipedia記事を保存できませんでした。接続状態を確認してください。")
+    st.caption(
+        "質問で新しい記事を取得した場合も自動保存します。記事は出典リンクとCC BY-SA 4.0の"
+        "ライセンス情報を付けて管理します。"
+    )
+
 with tasks_tab:
     st.subheader("タスク管理")
     st.write("タスクをSupabaseの長期記憶へ保存します。完了したタスクは削除できます。")
@@ -281,7 +358,7 @@ with setup_tab:
     st.write("AI処理はPython内で実行します。Supabaseへの記憶保存のみクラウド通信を使います。")
     st.table(
         [
-            {"項目": "AIエンジン", "状態": "Python Local Engine v1.1.0（生成AI API不要）"},
+            {"項目": "AIエンジン", "状態": "Python Local Engine v1.2.0（生成AI API不要）"},
             {"項目": "Supabase URL", "状態": "設定済み" if get_setting("SUPABASE_URL") else "未設定"},
             {"項目": "Supabase記憶API", "状態": "設定済み" if (get_setting("SUPABASE_PUBLISHABLE_KEY") and get_setting("MEMORY_API_TOKEN")) else "未設定"},
             {"項目": "アクセスパスワード", "状態": "設定済み" if get_setting("APP_ACCESS_PASSWORD") else "未設定"},
@@ -323,6 +400,7 @@ with setup_tab:
 - 質問の種類と必要な処理の自動判定
 - 安全な計算・複合単位変換と検算
 - 日時・記憶検索
+- Wikipediaの基礎記事一括取り込み・質問に応じた自動取得・保存・再利用
 - 資料の関連文検索・抽出的な要約
 - タスクの保存・削除
 - 目的別の計画作成

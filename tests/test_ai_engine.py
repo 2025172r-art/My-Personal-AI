@@ -50,7 +50,7 @@ def test_local_chat_and_help():
     answer = engine.reply("できること")["answer"]
     assert "安全な算術計算" in answer
     assert engine.health()["provider_api"] is False
-    assert engine.health()["version"] == "1.1.0"
+    assert engine.health()["version"] == "1.2.0"
     assert engine.health()["equation_solver"] is True
     assert engine.health()["statistics_engine"] is True
     assert engine.health()["percentage_solver"] is True
@@ -268,9 +268,9 @@ def test_private_queries_are_never_sent_to_reference_search():
     search.assert_not_called()
 
 
-def test_reference_tool_is_not_listed_as_a_user_facing_capability():
+def test_wikipedia_knowledge_base_is_advertised_without_a_manual_search_control():
     capabilities = LocalAIEngine().capabilities()
-    assert not any("Wikipedia" in item for item in capabilities)
+    assert any("Wikipedia" in item and "自動蓄積" in item for item in capabilities)
     assert not any("参考資料を内部取得" in item for item in capabilities)
 
 
@@ -290,9 +290,10 @@ def test_email_address_is_protected_from_external_lookup():
 
 
 
-def test_reference_engine_is_hidden_from_the_app_controls():
+def test_wikipedia_bulk_learning_has_no_manual_article_search_box():
     app_source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text(encoding="utf-8")
-    assert "Wikipedia" not in app_source
+    assert "fetch_core_wikipedia_articles" in app_source
+    assert "基礎Wikipedia記事をまとめて取り込む" in app_source
     assert "online_research" not in app_source
     assert "use_knowledge_search" not in app_source
 
@@ -629,7 +630,7 @@ def test_context_graph_handles_api_followup():
 
 def test_all_v09_tools_are_advertised_in_health():
     health = LocalAIEngine().health()
-    assert health["version"] == "1.1.0"
+    assert health["version"] == "1.2.0"
     assert health["combinatorics_solver"] is True
     assert health["probability_solver"] is True
     assert health["ohms_law_solver"] is True
@@ -747,7 +748,7 @@ def test_v10_runtime_learned_planning_route():
 
 def test_v10_health_exposes_new_brain_modules():
     health = LocalAIEngine().health()
-    assert health["version"] == "1.1.0"
+    assert health["version"] == "1.2.0"
     assert health["linear_system_solver"] is True
     assert health["number_theory"] is True
     assert health["chemistry_formula"] is True
@@ -837,6 +838,36 @@ def test_v11_matrix_brain_rejects_unsafe_or_invalid_inputs():
 
 def test_v11_health_exposes_linear_algebra_tool():
     engine = LocalAIEngine()
-    assert engine.health()["version"] == "1.1.0"
+    assert engine.health()["version"] == "1.2.0"
     assert engine.health()["linear_algebra_solver"] is True
     assert any(tool["name"] == "linear_algebra_solver" for tool in engine.tools())
+
+
+
+def test_v12_cached_wikipedia_article_is_reused_before_network_lookup():
+    pages = [{
+        "language": "ja",
+        "page_id": 4321,
+        "title": "量子もつれ",
+        "url": "https://ja.wikipedia.org/?curid=4321",
+        "extract": "量子もつれは、複数の量子系の状態に相関が現れる現象です。",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    }]
+    with patch("ai_engine.search_wikipedia") as search:
+        result = LocalAIEngine().reply(
+            "量子もつれとは何ですか？",
+            wiki_knowledge=pages,
+            sovereign_mode=False,
+        )
+    assert result["intent"] == "cached_wikipedia_research"
+    assert "複数の量子系" in result["answer"]
+    assert "CC BY-SA 4.0" in result["answer"]
+    assert result["sources"][0]["title"] == "量子もつれ"
+    search.assert_not_called()
+
+
+def test_v12_health_exposes_persistent_wikipedia_knowledge():
+    health = LocalAIEngine().health()
+    assert health["version"] == "1.2.0"
+    assert health["wikipedia_knowledge_base"] is True

@@ -1468,8 +1468,8 @@ def _clean_reference_query(query: str) -> str:
     return cleaned.strip(" ?？。！!、")[:120]
 
 
-def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
-    """Return short, cited extracts from Japanese Wikipedia, then English as fallback.
+def search_wikipedia(query: str, max_results: int = 3) -> list[dict[str, Any]]:
+    """Return bounded, cited article text from Japanese Wikipedia, then English as fallback.
 
     This is reference retrieval, not a generative AI model. Retrieved text is
     treated as untrusted reference material and is never executed as instructions.
@@ -1484,7 +1484,7 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
     if cached and now - cached[0] < _WIKIPEDIA_CACHE_TTL:
         return [dict(item) for item in cached[1]]
 
-    headers = {"User-Agent": "MyPersonalAI/0.6 (educational reference lookup)"}
+    headers = {"User-Agent": "MyPersonalAI/1.2.0 (https://github.com/2025172r-art/My-Personal-AI; personal educational use) Python requests"}
     for language in ("ja", "en"):
         endpoint = f"https://{language}.wikipedia.org/w/api.php"
         try:
@@ -1497,9 +1497,10 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
                     "srlimit": max(1, min(max_results, 3)),
                     "format": "json",
                     "utf8": 1,
+                    "maxlag": 5,
                 },
                 headers=headers,
-                timeout=(3, 5),
+                timeout=(5, 12),
             )
             search_response.raise_for_status()
             entries = search_response.json().get("query", {}).get("search", [])
@@ -1511,16 +1512,19 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
                 endpoint,
                 params={
                     "action": "query",
-                    "prop": "extracts",
+                    "prop": "extracts|info|revisions",
                     "pageids": "|".join(page_ids),
-                    "exintro": 1,
+                    "inprop": "url",
+                    "rvprop": "ids|timestamp",
                     "explaintext": 1,
-                    "exchars": 1200,
+                    "exsectionformat": "plain",
+                    "exchars": 10000,
                     "format": "json",
                     "utf8": 1,
+                    "maxlag": 5,
                 },
                 headers=headers,
-                timeout=(3, 5),
+                timeout=(5, 15),
             )
             extract_response.raise_for_status()
             pages = extract_response.json().get("query", {}).get("pages", {})
@@ -1531,11 +1535,22 @@ def search_wikipedia(query: str, max_results: int = 2) -> list[dict[str, str]]:
                 page_id = str(page.get("pageid", ""))
                 if not title or not extract or not page_id:
                     continue
+                revisions = page.get("revisions") or []
+                revision = revisions[0] if revisions and isinstance(revisions[0], dict) else {}
+                try:
+                    revision_id = int(revision.get("revid")) if revision.get("revid") else None
+                except (TypeError, ValueError):
+                    revision_id = None
                 results.append({
                     "title": title,
-                    "extract": extract[:1200],
-                    "url": f"https://{language}.wikipedia.org/?curid={page_id}",
+                    "extract": extract[:10000],
+                    "url": page.get("fullurl") or f"https://{language}.wikipedia.org/?curid={page_id}",
                     "language": language,
+                    "page_id": int(page_id),
+                    "revision_id": revision_id,
+                    "source_updated_at": revision.get("timestamp"),
+                    "license": "CC BY-SA 4.0",
+                    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
                 })
             if results:
                 _WIKIPEDIA_CACHE[cache_key] = (now, results)
@@ -1684,9 +1699,12 @@ def _format_reference_answer(query: str, references: list[dict[str, str]]) -> st
     ]
     for item in references[:2]:
         summary = _sentence_summary(item.get("extract", ""), max_sentences=3)
+        license_url = item.get("license_url") or "https://creativecommons.org/licenses/by-sa/4.0/"
+        license_name = item.get("license") or "CC BY-SA 4.0"
         lines.append(
             f"**{item.get('title', '参考資料')}**\n{summary}\n"
-            f"出典: [{item.get('title', '記事を開く')}]({item.get('url', '')})"
+            f"出典: [{item.get('title', '記事を開く')}]({item.get('url', '')}) "
+            f"（Wikipedia、[{license_name}]({license_url})）"
         )
     return "\n\n".join(lines)
 
@@ -1695,7 +1713,7 @@ class LocalAIEngine:
     """Transparent, API-free local agent with multi-intent routing."""
 
     name = "My Personal AI Local Engine"
-    version = "1.1.0"
+    version = "1.2.0"
 
     def capabilities(self) -> list[str]:
         return [
@@ -1732,6 +1750,8 @@ class LocalAIEngine:
             "ローカル学習データで訓練する質問分類器（長期記憶の学習例に対応）",
             "連立方程式・数論・化学式の専用推論",
             "理科・数学・プログラミングの基礎知識を拡張",
+            "Wikipediaの基礎記事を一括取得し、質問に応じて関連記事を自動蓄積",
+            "蓄積したWikipedia記事を検索・再利用し、出典とライセンスを表示",
         ]
 
     def tools(self) -> list[dict[str, str]]:
@@ -1763,6 +1783,7 @@ class LocalAIEngine:
             {"name": "command_policy", "description": "利用者優先の指揮系統と安全境界"},
             {"name": "question_analyzer", "description": "質問を分類し、必要な処理を自動判定"},
             {"name": "evidence_retrieval", "description": "ローカル知識で不足するときだけ参考資料を取得"},
+            {"name": "wikipedia_knowledge_base", "description": "保存したWikipedia記事を関連度で検索し、質問に再利用"},
         ]
 
     def health(self) -> dict[str, Any]:
@@ -1774,6 +1795,7 @@ class LocalAIEngine:
             "user_priority": True,
             "sovereign_style": True,
             "reference_search": True,
+            "wikipedia_knowledge_base": True,
             "automatic_tool_selection": True,
             "question_analysis": True,
             "equation_solver": True,
@@ -1830,6 +1852,7 @@ class LocalAIEngine:
         text: str,
         memories: list[dict[str, Any]],
         document_context: str,
+        wiki_knowledge: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         lowered = text.lower()
 
@@ -2067,6 +2090,17 @@ class LocalAIEngine:
                 "plan": [], "intent": "memory_context", "tools_used": ["memory_search"],
             }
 
+        cached_references = select_relevant_references(text, wiki_knowledge or [])
+        if cached_references and float(cached_references[0].get("relevance_score", 0.0)) >= 0.20:
+            return {
+                "answer": _format_reference_answer(text, cached_references),
+                "plan": [],
+                "intent": "cached_wikipedia_research",
+                "tools_used": ["wikipedia_knowledge_base"],
+                "sources": cached_references,
+                "reasoning_route": "persisted_wikipedia_article_reused",
+            }
+
         assessment = analyze_question(text, memories)
         intent_hint = assessment.get("intent_hint")
         intent_confidence = float(assessment.get("model_confidence", 0.0))
@@ -2166,10 +2200,12 @@ class LocalAIEngine:
         memories: list[dict[str, Any]] | None = None,
         document_context: str = "",
         sovereign_mode: bool = True,
+        wiki_knowledge: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         text = request.strip()
         history = history or []
         memories = memories or []
+        wiki_knowledge = wiki_knowledge or []
         if not text:
             return {"answer": "メッセージを入力してください。", "plan": [], "intent": "empty", "tools_used": []}
 
@@ -2179,7 +2215,7 @@ class LocalAIEngine:
             if contextual:
                 return self._apply_persona(contextual, sovereign_mode)
             result = self._reply_single(
-                parts[0], memories, document_context
+                parts[0], memories, document_context, wiki_knowledge
             )
             return self._apply_persona(result, sovereign_mode)
 
@@ -2187,7 +2223,7 @@ class LocalAIEngine:
         for part in parts:
             contextual = _answer_contextual_followup(part, history)
             results.append(
-                contextual or self._reply_single(part, memories, document_context)
+                contextual or self._reply_single(part, memories, document_context, wiki_knowledge)
             )
         sections = []
         for index, (part, result) in enumerate(zip(parts, results), 1):
@@ -2233,6 +2269,7 @@ def run_agent_task(
     use_web_search: bool = False,
     use_multi_agent: bool = False,
     sovereign_mode: bool = True,
+    wiki_knowledge: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Backward-compatible entry point; intentionally does not call any model API."""
     del client, use_web_search, use_multi_agent
@@ -2242,4 +2279,5 @@ def run_agent_task(
         memories=memories,
         document_context=document_context,
         sovereign_mode=sovereign_mode,
+        wiki_knowledge=wiki_knowledge,
     )
