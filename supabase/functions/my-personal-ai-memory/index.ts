@@ -126,29 +126,32 @@ Deno.serve(async (request: Request) => {
         if (!Array.isArray(body.pages) || body.pages.length < 1 || body.pages.length > 25) {
           return jsonResponse({ error: "Provide between 1 and 25 Wikipedia pages." }, 400);
         }
-        const rows = body.pages.map((raw: Record<string, unknown>) => {
-          const language = String(raw.language ?? "ja");
-          const pageId = Number(raw.page_id);
-          const title = String(raw.title ?? "").trim().slice(0, 300);
-          const url = String(raw.url ?? "").trim();
-          const articleText = String(raw.article_text ?? raw.extract ?? "").trim().slice(0, 18000);
+        const rows: Record<string, unknown>[] = [];
+        for (const raw of body.pages as unknown[]) {
+          if (!raw || typeof raw !== "object") continue;
+          const page = raw as Record<string, unknown>;
+          const language = String(page.language ?? "ja");
+          const pageId = Number(page.page_id);
+          const title = String(page.title ?? "").trim().slice(0, 300);
+          const url = String(page.url ?? "").trim();
+          const articleText = String(page.article_text ?? page.extract ?? "").trim().slice(0, 18000);
           if (!["ja", "en"].includes(language) || !Number.isSafeInteger(pageId) || pageId <= 0 ||
               !title || !articleText || !url.startsWith("https://" + language + ".wikipedia.org/")) {
-            return null;
+            continue;
           }
-          const revisionId = raw.revision_id == null ? null : Number(raw.revision_id);
-          return {
+          const revisionId = page.revision_id == null ? null : Number(page.revision_id);
+          rows.push({
             language,
             page_id: pageId,
             title,
             url,
             article_text: articleText,
             revision_id: Number.isSafeInteger(revisionId) && (revisionId as number) > 0 ? revisionId : null,
-            source_updated_at: raw.source_updated_at ? String(raw.source_updated_at) : null,
-            license: String(raw.license ?? "CC BY-SA 4.0").slice(0, 80),
-            license_url: String(raw.license_url ?? "https://creativecommons.org/licenses/by-sa/4.0/").slice(0, 300),
-          };
-        }).filter((row): row is NonNullable<typeof row> => row !== null);
+            source_updated_at: page.source_updated_at ? String(page.source_updated_at) : null,
+            license: String(page.license ?? "CC BY-SA 4.0").slice(0, 80),
+            license_url: String(page.license_url ?? "https://creativecommons.org/licenses/by-sa/4.0/").slice(0, 300),
+          });
+        }
 
         if (rows.length === 0) return jsonResponse({ saved: 0 });
         const { data, error } = await supabase.from("wiki_knowledge")
