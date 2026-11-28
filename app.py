@@ -57,6 +57,21 @@ if not authenticate():
 # ローカルAIエンジンは外部の生成AI APIキーを必要としません。
 store = MemoryStore.from_settings()
 
+# Seed the persistent Wiki cache once when the database is empty.
+# This avoids asking the owner to import articles one by one.
+if not st.session_state.get("wiki_bootstrap_checked", False):
+    st.session_state["wiki_bootstrap_checked"] = True
+    try:
+        if int(store.get_wikipedia_stats().get("count", 0)) == 0:
+            with st.spinner("初期Wikipedia知識20記事をまとめて取り込んでいます…"):
+                starter_pages = fetch_core_wikipedia_articles()
+                if starter_pages:
+                    st.session_state["wiki_bootstrap_saved_count"] = store.upsert_wikipedia_pages(starter_pages)
+                else:
+                    st.session_state["wiki_bootstrap_error"] = "初期記事を取得できませんでした。Wikipedia知識タブから再試行できます。"
+    except Exception as bootstrap_exc:
+        st.session_state["wiki_bootstrap_error"] = str(bootstrap_exc)
+
 # Single-owner ID: chat history remains available after reloads and on other devices.
 if "session_id" not in st.session_state:
     st.session_state.session_id = "personal-owner-default"
@@ -298,6 +313,10 @@ with wiki_tab:
         except Exception as exc:
             st.error(f"一括取り込みに失敗しました: {exc}")
 
+    if st.session_state.get("wiki_bootstrap_saved_count"):
+        st.success(f"初回セットとして{st.session_state['wiki_bootstrap_saved_count']}件の記事を自動取り込みしました。")
+    if st.session_state.get("wiki_bootstrap_error"):
+        st.warning("初回の自動取り込みに失敗しました。下のボタンで再試行できます。")
     if st.session_state.get("wiki_last_save_error"):
         st.warning("新しいWikipedia記事を保存できませんでした。接続状態を確認してください。")
     st.caption(
